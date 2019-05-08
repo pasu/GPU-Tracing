@@ -1,20 +1,14 @@
-<script src="gl-matrix-min.js"></script>
-
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 800;
 
 var frame_id = 1;
 
-const script = async () => {
-  // Canvas setup
-  const canvas = document.getElementById('myCanvas');
-  canvas.width = CANVAS_WIDTH;
-  canvas.height = CANVAS_HEIGHT;
+function main() {  
+  var canvas = document.getElementById('webgl');
 
-  // create WebGL2ComputeRenderingContext
-  const context = canvas.getContext('webgl2-compute', {antialias: false});
+  var context = canvas.getContext('webgl2-compute', {antialias: false});
   if (!context) {
-    document.body.className = 'error';
+    console.log('Failed to get the rendering context for WebGL');
     return;
   }
 
@@ -103,8 +97,8 @@ const script = async () => {
     float c = 1.0;
     vec4 col = vec4( c * 0.83, c, min( c * 1.3, 1.0 ), 1 );
 
-    vec3 aabb_min = vec3(-100,-100,-500);
-    vec3 aabb_max = vec3(100,100,-400);
+    vec3 aabb_min = vec3(-100,-100,-900);
+    vec3 aabb_max = vec3(100,100,-800);
     if ( intersectAABB( aabb_min, aabb_max, ray ) )
       {
       col = vec4( 1,0,0, 1 );
@@ -143,20 +137,34 @@ const script = async () => {
   context.bindFramebuffer(context.READ_FRAMEBUFFER, frameBuffer);
   context.framebufferTexture2D(context.READ_FRAMEBUFFER, context.COLOR_ATTACHMENT0, context.TEXTURE_2D, texture, 0);
 
-  // execute ComputeShader
-  context.useProgram(compute_ID);
-  context.uniform1ui( context.getUniformLocation( compute_ID, "frame_id" ), frame_id++ );
-  var mvMatrix = new Float32Array(16);
-  mvMatrix[0] = mvMatrix[5] = mvMatrix[10]  = mvMatrix[15] = 1;
-  context.uniformMatrix4fv(context.getUniformLocation(compute_ID, 'mvMatrix'),false,mvMatrix);
-  context.dispatchCompute(CANVAS_WIDTH / 32, CANVAS_HEIGHT / 4, 1);
-  context.memoryBarrier(context.SHADER_IMAGE_ACCESS_BARRIER_BIT);
+  var camera = new Camera();
+  walk_callback(canvas,camera);
+  setCameraSpeed(1);
 
-  // show computed texture to Canvas
-  context.blitFramebuffer(
-    0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
-    0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
-    context.COLOR_BUFFER_BIT, context.NEAREST);
-};
+  var mvMatrix = glMatrix.mat4.create();
 
-window.addEventListener('DOMContentLoaded', script);
+  var tick = function() {
+
+    updateCamera(camera);
+
+    context.useProgram(compute_ID);
+    context.uniform1ui( context.getUniformLocation( compute_ID, "frame_id" ), frame_id++ );
+    
+    camera.copyMCamera(mvMatrix);
+    //glMatrix.mat4.transpose(mvMatrix,mvMatrix)
+
+    context.uniformMatrix4fv(context.getUniformLocation(compute_ID, 'mvMatrix'),false,mvMatrix);
+    context.dispatchCompute(CANVAS_WIDTH / 32, CANVAS_HEIGHT / 4, 1);
+    context.memoryBarrier(context.SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    // show computed texture to Canvas
+    context.blitFramebuffer(
+      0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
+      0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
+      context.COLOR_BUFFER_BIT, context.NEAREST);
+
+    window.requestAnimationFrame(tick, canvas);
+  }
+
+  tick(); 
+}
