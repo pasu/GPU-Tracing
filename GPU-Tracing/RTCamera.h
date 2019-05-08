@@ -15,7 +15,7 @@ class RTCamera
 {
   public:
 
-      float speed;
+    float speed;
 
 	vec3 getEye()
 	{
