@@ -19,6 +19,9 @@ using namespace glm;
 #include "RTCamera.h"
 #include "RTCameraController.h"
 
+#include "./DS/datastructure.h"
+#include "./Scene/Scene.h"
+
 
 
 void processInput( GLFWwindow *window )
@@ -63,10 +66,28 @@ int main()
 	double lastTime = glfwGetTime();
 
     glm:mat4 modelViewMatrix = glm::mat4( 1.0 );
+    ////////////////////////////////////////////////////////////////////
+	GLuint rayBuffer_ID, triangleBuffer_ID;
 
+    Scene scene;
+	scene.addMesh( "./data/bunny.obj",vec3(0,0,-10) );
+	/*
+	float z = -800;
+	float w = 100;
+	vec3 v1 = vec3( -w, w, z );
+	vec3 v2 = vec3( -w, -w, z );
+	vec3 v3 = vec3( w, -w, z );
+	vec3 v4 = vec3( w, w, z );
+    scene.addTriangle( v1, v2, v3 );
+	scene.addTriangle( v1, v3, v4 );
+    */
+	scene.buffer2GPU( rayBuffer_ID, triangleBuffer_ID );
+	
+	GLuint genRay_SID = loadcomputeshader( "./shader/genRay.glsl" );
 	////////////////////////////////////////////////////////////////////
+    // hit with Ray
 	GLuint texHandle = genTexture();
-	GLuint compute_ID = loadcomputeshader( "./shader/compute.glsl" );
+	GLuint tracing_SID = loadcomputeshader( "./shader/tracingRay.glsl" );
 	///////////////////////////////////////////////////////////////////////
 
 	GLuint quad_ID = loadshaders( "./shader/quad.vertexshader", "./shader/quad.fragmentshader" );
@@ -119,10 +140,17 @@ int main()
 
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-		glUseProgram( compute_ID );
+		glUseProgram( genRay_SID );
 
-		glUniform1ui( glGetUniformLocation( compute_ID, "frame_id" ), frame_id );
-		glUniformMatrix4fv( glGetUniformLocation( compute_ID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
+		glUniform1ui( glGetUniformLocation( genRay_SID, "frame_id" ), frame_id );
+		glUniformMatrix4fv( glGetUniformLocation( genRay_SID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
+
+		glDispatchCompute( SCRWIDTH / LocalSize_X, SCRHEIGHT / LocalSize_Y, 1 ); // 512^2 threads in blocks of 16^2
+
+		glUseProgram( tracing_SID );
+
+		glUniform1ui( glGetUniformLocation( tracing_SID, "frame_id" ), frame_id );
+		glUniformMatrix4fv( glGetUniformLocation( tracing_SID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
 
 		glDispatchCompute( SCRWIDTH / LocalSize_X, SCRHEIGHT / LocalSize_Y, 1 ); // 512^2 threads in blocks of 16^2
 

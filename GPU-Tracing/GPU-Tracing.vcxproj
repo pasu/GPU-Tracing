@@ -97,7 +97,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>./lib/lib;</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opengl32.lib;FreeImage.lib;glfw3.lib;glad.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>assimp-vc140-mt.lib;opengl32.lib;FreeImage.lib;glfw3.lib;glad.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -154,20 +154,24 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>./lib/lib;</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opengl32.lib;FreeImage.lib;glfw3.lib;glad.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>assimp-vc140-mt.lib;opengl32.lib;FreeImage.lib;glfw3.lib;glad.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="DS\datastructure.h" />
+    <ClInclude Include="Mesh\RTMesh.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="programs\randomnumbers.h" />
     <ClInclude Include="RTCamera.h" />
     <ClInclude Include="RTCameraController.h" />
+    <ClInclude Include="Scene\Scene.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="shared.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Mesh\RTMesh.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -175,14 +179,17 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="RTCameraController.cpp" />
+    <ClCompile Include="Scene\Scene.cpp" />
     <ClCompile Include="texture.cpp" />
     <ClCompile Include="tracing.cpp" />
     <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shader\compute.glsl" />
+    <None Include="shader\genRay.glsl" />
     <None Include="shader\quad.fragmentshader" />
     <None Include="shader\quad.vertexshader" />
+    <None Include="shader\tracingRay.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
