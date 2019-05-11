@@ -50,6 +50,8 @@ struct RTTriangle
 
     float textures2_0;
 	float textures2_1;
+
+    int mIndex;
 };
 
 layout( std430, binding = 1 ) buffer TRIANGLE_BUFFER
@@ -57,7 +59,20 @@ layout( std430, binding = 1 ) buffer TRIANGLE_BUFFER
 	RTTriangle triangles[];
 };
 
-layout( std430, binding = 2 ) buffer TRIANGLE_NUMBER
+struct BVHNode_32
+{
+	vec3 aabb_minaabb_min;
+	int leftFirst;
+	vec3 aabb_minaabb_max;
+	int count;
+};
+
+layout( std430, binding = 2 ) buffer BVH_BUFFER
+{
+	BVHNode_32 bvh_nodes[];
+};
+
+layout( std430, binding = 3 ) buffer TRIANGLE_NUMBER
 {
 	int count;
 };
@@ -69,7 +84,7 @@ uint HALF_SCRWIDTH = 400u;
 const float very_large_float = 1e9f;
 const float very_small_float = 1e-9f;
 
-bool intersectAABB( vec3 aabb_min, vec3 aabb_max, RTRay ray )
+bool intersectAABB( vec3 aabb_min, vec3 aabb_max, RTRay ray, out float near, out float far )
 {
 	vec3 origin = ray.pos.xyz;
 	vec3 dir = ray.dir.xyz;
@@ -92,6 +107,10 @@ bool intersectAABB( vec3 aabb_min, vec3 aabb_max, RTRay ray )
 		if ( tMax < local_tMin )
 			return false;
 	}
+
+    near = local_tMin;
+	far = tMax;
+
 	return true;
 }
 
@@ -100,9 +119,9 @@ bool floatEquals(float value, float comp)
 	return abs( value - comp ) <= very_small_float;
 }
 
-vec3 intersectTriangle( RTRay ray, RTTriangle t )
+bool intersectTriangle( RTRay ray, RTTriangle t, out vec3 pnt )
 {
-	vec3 res = vec3( -1, -1, -1 );
+	pnt = vec3( -1, -1, -1 );
     
     vec3 origin = ray.pos.xyz;
 	vec3 dir = ray.dir.xyz;
@@ -118,53 +137,167 @@ vec3 intersectTriangle( RTRay ray, RTTriangle t )
 	float denominator = dot( P, AB ); //if negative triangle is backfacing (Cull here)
 
 	if ( floatEquals( denominator, 0.0f ) ) //ray parallel to triangle
-		return res;
+		return false;
 
 	float inverseDenominator = 1.0f / denominator;
 	vec3 T = origin - a;
 	float u = inverseDenominator * dot( P, T );
 	if ( u < 0 || u > 1 )
-		return res;
+		return false;
 
 	vec3 Q = cross( T, AB );
 	float v = inverseDenominator * dot( Q, dir );
 	if ( v < 0 || u + v > 1 )
-		return res;
+		return false;
 
-	res.x = u;
-	res.y = v;
-	res.z = inverseDenominator * dot( Q, AC );
+	pnt.x = u;
+	pnt.y = v;
+	pnt.z = inverseDenominator * dot( Q, AC );
 
-	return res;
+	return true;
 }
 
-vec3 intersectTriangle( RTRay ray, int idx )
+bool intersectTriangle( RTRay ray, int idx, out vec3 pnt )
 {
 	RTTriangle t = triangles[idx];
 
-	return intersectTriangle( ray, t );
+	return intersectTriangle( ray, t, pnt );
 }
 
-vec3 intersectTriangle_( RTRay r, int idx )
+struct BVHTraversal
 {
-	RTTriangle t = triangles[idx];
+	int i; // Node
+	float mint; // Minimum hit time for this node.
+};
 
-    vec3 a = vec3( t.vertices0_0, t.vertices0_1, t.vertices0_2 );
-	vec3 b = vec3( t.vertices1_0, t.vertices1_1, t.vertices1_2 );
-	vec3 c = vec3( t.vertices2_0, t.vertices2_1, t.vertices2_2 );
+struct RTIntersection
+{
+	vec3 normal;
+	float distance;
+	int triangle_id;
+};
 
-    vec3 origin = r.pos.xyz;
-	vec3 dir = r.dir.xyz;
+bool getIntersection( RTRay ray, out RTIntersection intersection )
+{
+	intersection.triangle_id = -1;
+	intersection.distance = -1.0f;
 
-	mat3 A = mat3( a.xyz - b.xyz, a.xyz - c.xyz, dir );
+	float bbhits[4];
+	int closer, other;
 
-	int d = int( abs( determinant( A ) ) < very_small_float );
+	// Working set
+	BVHTraversal todo[256];
+	int stackptr = 0;
 
-	vec3 l = inverse( A ) * ( a.xyz - origin );
+	// "Push" on the root node to the working set
+	todo[stackptr].i = 0;
+	todo[stackptr].mint = -9999999.f;
 
-	l.z = ( int( l.x < 0 || l.y < 0 || ( ( l.x + l.y ) > 1 ) || l.z < 0 ) + d ) * very_large_float + l.z * ( 1 - d );
+    while ( stackptr >= 0 )
+	{
+		// Pop off the next node to work on.
+		int ni = todo[stackptr].i;
+		float fnear = todo[stackptr].mint;
+		stackptr--;
+		BVHNode_32 node = bvh_nodes[ni];
 
-	return l;
+		// If this node is further than the closest found intersection, continue
+		if ( intersection.distance > 0.0f && fnear > intersection.distance )
+			continue;
+
+        vec2 uv;
+        vec3 hitPnt;
+        if ( ( node.leftFirst & 0x1 ) == 0 )
+		{
+			BVHNode_32 node1 = bvh_nodes[12];
+			if ( ( node1.leftFirst & 0x1 ) == 0 )
+			{
+				intersection.triangle_id = 1;
+			}
+
+			int start = ( node.leftFirst >> 1 );
+
+            for (int o = 0; o < node.count; ++o)
+            {
+                if (intersectTriangle(ray, start + o, hitPnt))
+                {
+					if ( intersection.distance < 0.0f || hitPnt.z < intersection.distance )
+					{
+						intersection.distance = hitPnt.z;
+						intersection.triangle_id = start + o;
+						uv = hitPnt.xy;
+					}
+                }
+            }
+		}
+        else
+        {
+			int rightOffset = ( node.leftFirst >> 1 );
+			bool hitc0 = intersectAABB( bvh_nodes[ni + 1].aabb_minaabb_min, bvh_nodes[ni + 1].aabb_minaabb_max, ray,
+						   bbhits[0], bbhits[1] );
+			bool hitc1 = intersectAABB( bvh_nodes[ni + rightOffset].aabb_minaabb_min, 
+                bvh_nodes[ni + rightOffset].aabb_minaabb_max, ray,
+										bbhits[2], bbhits[3] );
+
+            if ( hitc0 && hitc1 )
+			{
+
+				// We assume that the left child is a closer hit...
+				closer = ni + 1;
+				other = ni + rightOffset;
+
+				if ( bbhits[2] < bbhits[0] )
+				{
+					float tmp = bbhits[0];
+					bbhits[0] = bbhits[2];
+					bbhits[2] = tmp;
+
+					tmp = bbhits[1];
+					bbhits[1] = bbhits[3];
+					bbhits[3] = tmp;
+
+					int id = closer;
+					closer = other;
+					other = id;
+				}
+
+				// It's possible that the nearest object is still in the other side, but we'll
+				// check the further-awar node later...
+
+				// Push the farther first
+				BVHTraversal bvhT1;
+				bvhT1.i = other;
+				bvhT1.mint = bbhits[2];
+				todo[++stackptr] = bvhT1;
+
+				// And now the closer (with overlap test)
+				BVHTraversal bvhT2;
+				bvhT2.i = closer;
+				bvhT2.mint = bbhits[0];
+				todo[++stackptr] = bvhT2;
+			}
+			else if ( hitc0 )
+			{
+				BVHTraversal bvhT;
+				bvhT.i = ni + 1;
+				bvhT.mint = bbhits[0];
+				todo[++stackptr] = bvhT;                
+			}
+            else if ( hitc1 )
+			{
+				BVHTraversal bvhT;
+				bvhT.i = ni + rightOffset;
+				bvhT.mint = bbhits[2];
+				todo[++stackptr] = bvhT;
+			}
+
+        }
+	}
+
+    if ( intersection.triangle_id == -1 )
+		return false;
+
+    return true;
 }
 
 void main()
@@ -184,15 +317,24 @@ void main()
 		col = vec4( 1, 0, 0, 1 );
 	}
 	*/
+
+    vec3 hitPnt;
+	RTIntersection intersection;
+    if (getIntersection(ray, intersection))
+    {
+		col = vec4( 1, 0, 0, 1 );
+    }
+
+	/*
     for ( int i = 0; i < count; i++ )
 	{
-		vec3 res = intersectTriangle( ray, i );
-		if ( !floatEquals( res.x, -1.0f ) )
+		if ( intersectTriangle( ray, i, hitPnt ) )
 		{
 			col = vec4( 1, 0, 0, 1 );
 			break;
 		}
 	}
+    */
     
 	imageStore( destTex, storePos, col );
 }

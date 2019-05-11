@@ -13,7 +13,7 @@ using namespace std;
 class RTMesh
 {
     public:
-	    RTMesh( const char *a_File );
+	    RTMesh( const char *a_File, const int& materialIndex );
 	    ~RTMesh();
 
         void applyTransforms();
@@ -47,4 +47,6 @@ class RTMesh
 
 		mat4 modelMatrix;  //Object to world Matrix
 		mat4 normalMatrix; //Tranposed Inverse Model Matrix
+
+        int mIndex;
 };

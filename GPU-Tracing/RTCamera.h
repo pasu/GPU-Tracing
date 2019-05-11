@@ -55,7 +55,7 @@ class RTCamera
 		Update();
 
 		// depth field
-		float factor = 0.1;
+		float factor = 0.1f;
 		aperture = 0;
 		d = factor*SCRWIDTH / 2;
 		viewplane_size = factor*SCRWIDTH;

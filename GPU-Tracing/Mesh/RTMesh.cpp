@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-RTMesh::RTMesh( const char *a_File )
+RTMesh::RTMesh( const char *a_File, const int &materialIndex )
 {
 	importer = new Assimp::Importer();
 
@@ -20,6 +20,7 @@ RTMesh::RTMesh( const char *a_File )
 	}
 
     modelMatrix = normalMatrix = glm::mat4( 1.0 );
+	mIndex = materialIndex;
 }
 
 RTMesh::~RTMesh()
@@ -112,7 +113,8 @@ void RTMesh::getTriangles( vector<RTTriangle *> &triangleList )
 
 			triangleList.push_back( new RTTriangle( vertices[0], vertices[1], vertices[2],
 													normals[0], normals[1], normals[2],
-													texCoords[0], texCoords[1], texCoords[2]) );
+													texCoords[0], texCoords[1], texCoords[2],
+													mIndex ) );
 		}
 	}
 }

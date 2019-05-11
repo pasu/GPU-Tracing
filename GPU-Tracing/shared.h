@@ -9,3 +9,5 @@
 
 #define SAMPLE_NUM 16
 #define SAMPLE_NUM2 SAMPLE_NUM *SAMPLE_NUM
+
+//#define SAH_ON

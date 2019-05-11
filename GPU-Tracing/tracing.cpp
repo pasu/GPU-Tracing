@@ -67,7 +67,8 @@ int main()
 
     glm:mat4 modelViewMatrix = glm::mat4( 1.0 );
     ////////////////////////////////////////////////////////////////////
-	GLuint rayBuffer_ID, triangleBuffer_ID;
+    // SSAO
+	GLuint rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID;
 
     Scene scene;
 	scene.addMesh( "./data/bunny.obj",vec3(0,0,-10) );
@@ -81,7 +82,7 @@ int main()
     scene.addTriangle( v1, v2, v3 );
 	scene.addTriangle( v1, v3, v4 );
     */
-	scene.buffer2GPU( rayBuffer_ID, triangleBuffer_ID );
+	scene.buffer2GPU( rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID );
 	
 	GLuint genRay_SID = loadcomputeshader( "./shader/genRay.glsl" );
 	////////////////////////////////////////////////////////////////////
@@ -125,7 +126,7 @@ int main()
 
     ////////////////////////////////////////////////////////
 	RTCamera* camera = new RTCamera;
-	setCameraSpeed( 1 );
+	setCameraSpeed( 0.1 );
     /////////////////////////////////////////////////////////
 	while ( !glfwWindowShouldClose( window ) )
 	{
