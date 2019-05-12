@@ -72,9 +72,41 @@ layout( std430, binding = 2 ) buffer BVH_BUFFER
 	BVHNode_32 bvh_nodes[];
 };
 
-layout( std430, binding = 3 ) buffer TRIANGLE_NUMBER
+struct RTMaterial
 {
-	int count;
+	vec3 color;
+	float reflectionFactor;
+
+	vec3 emission;
+	float indexOfRefraction;
+
+	int shadingType;
+	int texID;
+	float m_pow;
+	float m_k;
+};
+
+layout( std430, binding = 3 ) buffer MATERIAL_BUFFER
+{
+	RTMaterial materials[];
+};
+
+layout( std430, binding = 4 ) buffer TEXTURE_BUFFER
+{
+	float texture_buf[];
+};
+
+struct RTTexInfo
+{
+	int idx;
+	int offset;
+	int width;
+	int height;
+};
+
+layout( std430, binding = 5 ) buffer TexInfo_BUFFER
+{
+	RTTexInfo textureInfos[];
 };
 
 uint random_seed;
@@ -172,7 +204,8 @@ struct BVHTraversal
 
 struct RTIntersection
 {
-	vec3 normal;
+	float u;
+	float v;
 	float distance;
 	int triangle_id;
 };
@@ -205,16 +238,9 @@ bool getIntersection( RTRay ray, out RTIntersection intersection )
 		if ( intersection.distance > 0.0f && fnear > intersection.distance )
 			continue;
 
-        vec2 uv;
         vec3 hitPnt;
         if ( ( node.leftFirst & 0x1 ) == 0 )
 		{
-			BVHNode_32 node1 = bvh_nodes[12];
-			if ( ( node1.leftFirst & 0x1 ) == 0 )
-			{
-				intersection.triangle_id = 1;
-			}
-
 			int start = ( node.leftFirst >> 1 );
 
             for (int o = 0; o < node.count; ++o)
@@ -223,9 +249,10 @@ bool getIntersection( RTRay ray, out RTIntersection intersection )
                 {
 					if ( intersection.distance < 0.0f || hitPnt.z < intersection.distance )
 					{
+						intersection.u = hitPnt.x;
+						intersection.v = hitPnt.y;
 						intersection.distance = hitPnt.z;
 						intersection.triangle_id = start + o;
-						uv = hitPnt.xy;
 					}
                 }
             }
@@ -300,6 +327,114 @@ bool getIntersection( RTRay ray, out RTIntersection intersection )
     return true;
 }
 
+struct SurfaceData
+{
+	vec3 position;
+	vec3 normal;
+	vec2 texCoord;
+	int materialID;
+};
+
+void Barycentric( vec3 p, vec3 a, vec3 b, vec3 c, out float u, out float v, out float w )
+{
+	vec3 v0 = b - a, v1 = c - a, v2 = p - a;
+	float d00 = dot( v0, v0 );
+	float d01 = dot( v0, v1 );
+	float d11 = dot( v1, v1 );
+	float d20 = dot( v2, v0 );
+	float d21 = dot( v2, v1 );
+	float denom = d00 * d11 - d01 * d01;
+	v = ( d11 * d20 - d01 * d21 ) / denom;
+	w = ( d00 * d21 - d01 * d20 ) / denom;
+	u = 1.0f - v - w;
+}
+
+void getSurfaceData(RTRay ray, RTIntersection intersection, out SurfaceData hitPnt)
+{
+	RTTriangle tri = triangles[intersection.triangle_id];
+
+    hitPnt.position = ray.pos.xyz + ray.dir.xyz * intersection.distance;
+
+    hitPnt.normal = normalize( vec3( tri.normals0_0 + intersection.u * ( tri.normals1_0 - tri.normals0_0 ) + intersection.v * ( tri.normals2_0 - tri.normals0_0 ),
+									 tri.normals0_1 + intersection.u * ( tri.normals1_1 - tri.normals0_1 ) + intersection.v * ( tri.normals2_1 - tri.normals0_1 ),
+									 tri.normals0_2 + intersection.u * ( tri.normals1_2 - tri.normals0_1 ) + intersection.v * ( tri.normals2_2 - tri.normals0_2 ) ) );
+
+    float areaABC, areaPBC, areaPCA;
+	Barycentric( hitPnt.position, vec3( tri.vertices0_0, tri.vertices0_1, tri.vertices0_2 ), 
+                    vec3( tri.vertices1_0, tri.vertices1_1, tri.vertices1_2 ),
+				    vec3( tri.vertices2_0, tri.vertices2_1, tri.vertices2_2 ),
+				 areaABC, areaPBC, areaPCA );
+
+    hitPnt.texCoord = vec2( tri.textures0_0, tri.textures0_1 ) * areaABC 
+        + vec2( tri.textures1_0, tri.textures1_1 ) * areaPBC 
+        + vec2( tri.textures2_0, tri.textures2_1 ) * areaPCA;
+
+    hitPnt.materialID = tri.mIndex;
+
+    return;
+}
+
+vec3 getTexelFromFile(RTTexInfo info, int x, int y)
+{
+	int basePixel = info.offset / 4 + ( x + ( ( ( info.height - 1 ) - y ) * info.width ) );
+	return vec3( texture_buf[basePixel * 3], texture_buf[basePixel * 3 + 1], texture_buf[basePixel * 3 + 2] );
+}
+
+vec3 bilinearInterpolation(RTTexInfo info, float u, float v)
+{
+	int width = info.width;
+	int height = info.height;
+	float pu = float( width - 1 ) * u;
+	float pv = float( height - 1 ) * v;
+	int x = int( pu );
+	int y = int( pv );
+	float uPrime = pu - float( x );
+	float vPrime = pv - float( y );
+
+	int xl = x - 1 >= 0 ? x - 1 : width - 1;
+	int xr = x + 1 < width ? x + 1 : 0;
+	int yb = y - 1 >= 0 ? y - 1 : height - 1;
+	int yt = y + 1 < height ? y + 1 : 0;
+
+    return ( 1.0f - uPrime ) * ( 1.0f - vPrime ) * getTexelFromFile( info, xl, yb) +
+		   uPrime * ( 1.0f - vPrime ) * getTexelFromFile( info, xr, yb ) +
+		   ( 1.0f - uPrime ) * vPrime * getTexelFromFile( info, xl, yt ) +
+		   uPrime * vPrime * getTexelFromFile( info, xr, yt);
+}
+
+vec3 getTexel( RTTexInfo info, float s, float t )
+{
+	vec2 scale = vec2( 1.0f );
+
+	s *= scale.x;
+	t *= scale.y;
+
+	float wrappedS = s - floor(s);
+	float wrappedT = t - floor( t );
+
+    return bilinearInterpolation( info, wrappedS, wrappedT );
+}
+
+vec4 getAlbedoAtPoint( SurfaceData hitPnt )
+{
+	RTMaterial material = materials[hitPnt.materialID];
+
+    if (floatEquals(texture_buf[3], 0.1f))
+    {
+		return vec4( 1, 1, 0, 1 );
+    }
+
+	if ( material.texID == -1 )
+	{
+		return vec4( material.color, 1.0 );
+	}
+	else
+	{
+		int texInfoID = material.texID;
+		return vec4( getTexel( textureInfos[texInfoID], hitPnt.texCoord.x, hitPnt.texCoord.y ), 1.0f );
+	}
+}
+
 void main()
 {
 	ivec2 storePos = ivec2( gl_GlobalInvocationID.xy );
@@ -318,11 +453,12 @@ void main()
 	}
 	*/
 
-    vec3 hitPnt;
 	RTIntersection intersection;
     if (getIntersection(ray, intersection))
     {
-		col = vec4( 1, 0, 0, 1 );
+		SurfaceData hitPnt;
+		getSurfaceData( ray, intersection, hitPnt );
+		col = getAlbedoAtPoint( hitPnt );
     }
 
 	/*

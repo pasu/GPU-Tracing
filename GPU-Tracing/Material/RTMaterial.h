@@ -24,6 +24,7 @@ class RTMaterial
 public:
 	RTMaterial( const vec3 &color, const vec3 &emission, const ShadingType shadingType, 
         const float& reflectionFactor, const float& indexOfRefraction, 
+        const int& _texID,
         const float &_pow, const float &_k );
   ~RTMaterial();
 
@@ -35,6 +36,7 @@ private:
   float indexOfRefraction;
 
   int shadingType;
+  int texID;
   // glossy, phong and microface
   float m_pow;
   float m_k;

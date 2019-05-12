@@ -22,7 +22,12 @@ using namespace glm;
 #include "./DS/datastructure.h"
 #include "./Scene/Scene.h"
 
+#include "./Material/RTTextureManager.h"
+#include "./Material/RTMaterialManager.h"
 
+
+RTTextureManager gTexManager;
+RTMaterialManager gMaterialManager;
 
 void processInput( GLFWwindow *window )
 {
@@ -67,11 +72,15 @@ int main()
 
     glm:mat4 modelViewMatrix = glm::mat4( 1.0 );
     ////////////////////////////////////////////////////////////////////
-    // SSAO
-	GLuint rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID;
+    // create scene
+	int idx_texture = gTexManager.CreateTexture( "./data/Wood_Tower_Col.jpg" );
+	int idx_material = gMaterialManager.CreateMaterial( vec3( 1 ), vec3( 0 ), DIFFUSE_AND_REFLECTIVE,
+        0.0f, 2.5f,
+        idx_texture,
+        2.0f,0.0f);
 
     Scene scene;
-	scene.addMesh( "./data/bunny.obj",vec3(0,0,-10) );
+	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0, 0, -10 ) );
 	/*
 	float z = -800;
 	float w = 100;
@@ -82,7 +91,12 @@ int main()
     scene.addTriangle( v1, v2, v3 );
 	scene.addTriangle( v1, v3, v4 );
     */
-	scene.buffer2GPU( rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID );
+	// SSAO
+	GLuint rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
+        materialsBuffer_ID, texturesBuffer_ID,textureInfosBuffer_ID;
+
+	scene.buffer2GPU( rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
+        materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID );
 	
 	GLuint genRay_SID = loadcomputeshader( "./shader/genRay.glsl" );
 	////////////////////////////////////////////////////////////////////
@@ -131,7 +145,6 @@ int main()
 	while ( !glfwWindowShouldClose( window ) )
 	{
 		static unsigned int frame_id = 0;
-		frame_id++;
 
         updateCamera( *camera );
 		camera->copyMCamera( modelViewMatrix );
@@ -150,7 +163,7 @@ int main()
 
 		glUseProgram( tracing_SID );
 
-		glUniform1ui( glGetUniformLocation( tracing_SID, "frame_id" ), frame_id );
+		glUniform1ui( glGetUniformLocation( tracing_SID, "frame_id" ), frame_id++ );
 		glUniformMatrix4fv( glGetUniformLocation( tracing_SID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
 
 		glDispatchCompute( SCRWIDTH / LocalSize_X, SCRHEIGHT / LocalSize_Y, 1 ); // 512^2 threads in blocks of 16^2

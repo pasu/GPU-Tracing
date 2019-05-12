@@ -162,6 +162,8 @@
     <ClInclude Include="DS\datastructure.h" />
     <ClInclude Include="Material\RTMaterial.h" />
     <ClInclude Include="Material\RTMaterialManager.h" />
+    <ClInclude Include="Material\RTTexture.h" />
+    <ClInclude Include="Material\RTTextureManager.h" />
     <ClInclude Include="Mesh\RTMesh.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="programs\randomnumbers.h" />
@@ -177,6 +179,8 @@
     <ClCompile Include="BVH\BVH.cpp" />
     <ClCompile Include="Material\RTMaterial.cpp" />
     <ClCompile Include="Material\RTMaterialManager.cpp" />
+    <ClCompile Include="Material\RTTexture.cpp" />
+    <ClCompile Include="Material\RTTextureManager.cpp" />
     <ClCompile Include="Mesh\RTMesh.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
