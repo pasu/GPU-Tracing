@@ -10,7 +10,7 @@ struct RTRay
 	vec4 dir;
 };
 
-layout( std430, binding = 0 ) buffer RTRAY_BUFFER
+layout( std430, binding = 1 ) buffer RTRAY_BUFFER
 {
 	RTRay rays[];
 };

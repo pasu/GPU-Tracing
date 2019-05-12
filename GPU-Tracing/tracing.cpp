@@ -92,10 +92,10 @@ int main()
 	scene.addTriangle( v1, v3, v4 );
     */
 	// SSAO
-	GLuint rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
+	GLuint screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
         materialsBuffer_ID, texturesBuffer_ID,textureInfosBuffer_ID;
 
-	scene.buffer2GPU( rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
+	scene.buffer2GPU( screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
         materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID );
 	
 	GLuint genRay_SID = loadcomputeshader( "./shader/genRay.glsl" );

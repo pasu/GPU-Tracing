@@ -5,13 +5,18 @@ layout( rgba8, binding = 0 ) writeonly uniform highp image2D destTex;
 uniform uint frame_id;
 uniform mat4 mvMatrix;
 
+layout( std430, binding = 0 ) buffer SCREEN_BUFFER
+{
+	vec4 colors[];
+};
+
 struct RTRay
 {
 	vec4 pos;
 	vec4 dir;
 };
 
-layout( std430, binding = 0 ) buffer RTRAY_BUFFER
+layout( std430, binding = 1 ) buffer RTRAY_BUFFER
 {
 	RTRay rays[];
 };
@@ -54,7 +59,7 @@ struct RTTriangle
     int mIndex;
 };
 
-layout( std430, binding = 1 ) buffer TRIANGLE_BUFFER
+layout( std430, binding = 2 ) buffer TRIANGLE_BUFFER
 {
 	RTTriangle triangles[];
 };
@@ -67,7 +72,7 @@ struct BVHNode_32
 	int count;
 };
 
-layout( std430, binding = 2 ) buffer BVH_BUFFER
+layout( std430, binding = 3 ) buffer BVH_BUFFER
 {
 	BVHNode_32 bvh_nodes[];
 };
@@ -86,12 +91,12 @@ struct RTMaterial
 	float m_k;
 };
 
-layout( std430, binding = 3 ) buffer MATERIAL_BUFFER
+layout( std430, binding = 4 ) buffer MATERIAL_BUFFER
 {
 	RTMaterial materials[];
 };
 
-layout( std430, binding = 4 ) buffer TEXTURE_BUFFER
+layout( std430, binding = 5 ) buffer TEXTURE_BUFFER
 {
 	float texture_buf[];
 };
@@ -104,7 +109,7 @@ struct RTTexInfo
 	int height;
 };
 
-layout( std430, binding = 5 ) buffer TexInfo_BUFFER
+layout( std430, binding = 6 ) buffer TexInfo_BUFFER
 {
 	RTTexInfo textureInfos[];
 };
@@ -435,6 +440,196 @@ vec4 getAlbedoAtPoint( SurfaceData hitPnt )
 	}
 }
 
+float xorshift32()
+{
+	random_seed ^= random_seed << 13;
+	random_seed ^= random_seed >> 17;
+	random_seed ^= random_seed << 5;
+	return float( random_seed ) * 2.3283064365387e-10f;
+}
+
+const float RT_PI = 3.1415926535897f;
+const float INV_PI = 1.0f / RT_PI;
+const float shadowBias = 0.01f;
+
+vec3 sampleCosHemisphere( vec3 normal )
+{
+	vec3 u, v, w;
+	w = normal;
+
+    if ( abs( w.x ) > abs( w.y ) )
+		u = normalize( cross( vec3( 0, 1, 0 ), w ) );
+	else
+		u = normalize( cross( vec3( 1, 0, 0 ), w ) );
+
+    v = cross( w, u );
+
+    float a = xorshift32(), b = xorshift32();
+	float sini = sqrt( a ), cosi = 2.0f * RT_PI * b;
+    
+	return normalize( ( sini * cos( cosi ) * u ) + ( sini * sin( cosi ) * v ) + ( sqrt( 1.0f - a ) * w ) );
+}
+
+vec3 random_in_unit_sphere()
+{
+	vec3 vec;
+
+	do
+	{
+		vec = 2.0f * vec3( xorshift32(), xorshift32(), xorshift32() ) - vec3( 1.0f, 1.0f, 1.0f );
+	} while ( length(vec) >= 1.0f );
+
+	return normalize( vec );
+}
+
+void sampleDiffuse(vec3 normal, out vec3 in_dir, out float pdf)
+{
+	in_dir = sampleCosHemisphere( normal );
+	pdf = dot( normal, in_dir ) * INV_PI;
+}
+
+
+bool evaluate(RTMaterial material, RTRay ray, SurfaceData hitPnt,
+    out vec3 random_dir, out float pdf, out vec4 albedo)
+{
+	albedo = getAlbedoAtPoint( hitPnt );
+
+    switch (material.shadingType)
+    {
+	case 1:
+		sampleDiffuse( hitPnt.normal, random_dir, pdf );
+		return true;
+		break;
+	default:
+		break;
+    }
+
+	return false;
+}
+
+float brdf( RTMaterial material, RTRay ray, SurfaceData hitPnt, RTRay ray_random )
+{
+	float cosine = 0;
+	vec3 reflect_dir;
+
+    switch ( material.shadingType )
+	{
+	case 1:
+		cosine = dot( hitPnt.normal, ray_random.dir.xyz );
+		cosine = cosine < 0.0 ? 0.0f : cosine;
+		return cosine * INV_PI;
+		break;
+		break;
+	default:
+		break;
+	}
+}
+
+const int DIFFUSE = 1;
+const int maxRecursionDepth = 5;
+
+vec4 path_sample( RTRay ray, RTIntersection intersection, int depth )
+{
+	vec3 finalColor = vec3( 0 );
+	vec3 color_light = vec3( 1 ); 
+    vec3 color_obj = vec3( 1 ); 
+    vec3 brdf_weight = vec3( 1.0f ); 
+    vec3 brdf_weight_l = vec3( 1.0f ); 
+    float pre_pdf_hemi_brdf = 1.0f;
+
+    for (int i = 0; i < maxRecursionDepth*2; i++)
+    {
+		vec4 color_scene = vec4( 0.83f, 1.0f, 1.0f, 1.0f );
+
+		if ( !getIntersection( ray, intersection ) )
+		{
+			color_obj = brdf_weight * color_obj * color_scene.xyz;
+			break;
+		}
+
+		SurfaceData hitPnt;
+		getSurfaceData( ray, intersection, hitPnt );
+		RTMaterial material = materials[hitPnt.materialID];
+
+		// light material, MIS
+		if ( material.emission != vec3( 0.0f, 0.0f, 0.0f ) )
+		{
+			color_obj = brdf_weight_l * color_obj * material.emission;
+			break;
+		}
+
+		float pdf_hemi_brdf, pdf_light_nee = 0.0f;
+		float weight_indirect = 1.0f, weight_direct = 0.0f;
+
+		vec3 random_dir;
+		vec4 albedo;
+
+		bool bContinue = evaluate( material, ray, hitPnt, random_dir, pdf_hemi_brdf, albedo );
+		if ( !bContinue )
+		{
+			color_obj = brdf_weight * color_obj * albedo.xyz;
+			break;
+		}
+
+		vec3 finalColor = vec3( 0 );
+		RTRay ray_random;
+		ray_random.pos = vec4( hitPnt.position + shadowBias * random_dir, 1.0f );
+		ray_random.dir = vec4( random_dir, 1.0f );
+
+		// NEE
+		if ( ( material.shadingType & DIFFUSE ) == 1 )
+		{
+			vec3 light = vec3( 0.0f );
+			float w = 0.0f;
+			finalColor += brdf_weight * albedo.xyz * light * w;
+		}
+
+		// Russian roulette
+		float max = max( albedo.x, max( albedo.y, albedo.z ) );
+		if ( depth > maxRecursionDepth )
+		{
+			if ( xorshift32() < max )
+			{
+				// Make up for the loss
+				albedo *= ( 1.0 / max );
+			}
+			else
+			{
+				color_obj = brdf_weight * color_obj * color_scene.xyz;
+				break;
+			}
+		}
+
+		RTIntersection intersection2;
+		//vec4 diffuse_color = path_sample( ray_random, intersection2, depth + 1 );
+		vec4 diffuse_color = vec4( 1 );
+
+		if ( intersection2.triangle_id != -1 )
+		{
+			RTTriangle tri_nee = triangles[intersection2.triangle_id];
+			RTMaterial material_nee = materials[tri_nee.mIndex];
+
+			if ( material_nee.emission != vec3( 0.0f, 0.0f, 0.0f ) )
+			{
+				vec4 light = vec4( 1.0f );
+				finalColor += vec3( 0.0f );
+			}
+		}
+
+        brdf_weight_l = brdf_weight_l * albedo.xyz * brdf( material, ray, hitPnt, ray_random ) * INV_PI;
+		brdf_weight = brdf_weight_l * ( 1.0f / pdf_hemi_brdf );
+
+        ray.pos = ray_random.pos;
+		ray.dir = ray_random.dir;
+
+        pre_pdf_hemi_brdf = pdf_hemi_brdf;
+    }
+
+    finalColor += color_obj;
+
+	return vec4( finalColor, 1.0f );
+}
+
 void main()
 {
 	ivec2 storePos = ivec2( gl_GlobalInvocationID.xy );
@@ -443,24 +638,24 @@ void main()
 	RTRay ray = rays[idx];
 
     float c = 1.0;
-	vec4 col = vec4( c * 0.83, c, min( c * 1.3, 1.0 ), 1 );
-	/*
-    vec3 aabb_min = vec3( -100, -100, -900 );
-	vec3 aabb_max = vec3( 100, 100, -800 );
-	if ( intersectAABB( aabb_min, aabb_max, ray ) )
-	{
-		col = vec4( 1, 0, 0, 1 );
-	}
-	*/
+	colors[idx] = vec4( c * 0.83, c, min( c * 1.3, 1.0 ), 1 );
+
+    uint largePrime1 = 386030683u;
+	uint largePrime2 = 919888919u;
+	uint largePrime3 = 101414101u;
+
+    random_seed = ( ( uint( storePos.x ) * largePrime1 + uint( storePos.y ) ) * largePrime1 + frame_id * largePrime3 );
 
 	RTIntersection intersection;
+	colors[idx] = path_sample( ray, intersection, 0 );
+	/*
     if (getIntersection(ray, intersection))
     {
 		SurfaceData hitPnt;
 		getSurfaceData( ray, intersection, hitPnt );
-		col = getAlbedoAtPoint( hitPnt );
+		colors[idx] = getAlbedoAtPoint( hitPnt );
     }
-
+    */
 	/*
     for ( int i = 0; i < count; i++ )
 	{
@@ -472,5 +667,5 @@ void main()
 	}
     */
     
-	imageStore( destTex, storePos, col );
+	imageStore( destTex, storePos, colors[idx] );
 }

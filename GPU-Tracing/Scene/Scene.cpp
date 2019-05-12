@@ -47,12 +47,16 @@ void Scene::addTriangle( const vec3 &v1, const vec3 &v2, const vec3 &v3, const v
 	arrTriangles.push_back( RTTriangle(v1,v2,v3,n1,n2,n3,t1,t2,t3, materialIndex) );
 }
 
-void Scene::buffer2GPU( GLuint &rayBuffer_ID, GLuint &triangleBuffer_ID, GLuint &bvhBuffer_ID,
+void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &triangleBuffer_ID, GLuint &bvhBuffer_ID,
 						GLuint &materialsBuffer_ID,
 						GLuint &texturesBuffer_ID,
 						GLuint &textureInfosBuffer_ID)
 {
 	BuildBVHTree();
+
+    glGenBuffers( 1, &screenBuffer_ID );
+	glBindBuffer( GL_SHADER_STORAGE_BUFFER, screenBuffer_ID );
+	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( vec4 ) * SCRWIDTH * SCRHEIGHT, NULL, GL_STATIC_READ );
 
 	glGenBuffers( 1, &rayBuffer_ID );
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, rayBuffer_ID );
@@ -88,12 +92,13 @@ void Scene::buffer2GPU( GLuint &rayBuffer_ID, GLuint &triangleBuffer_ID, GLuint 
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, textureInfosBuffer_ID );
 	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( RTTexInfo ) * texInfos.size(), &texInfos[0], GL_STATIC_DRAW );
 
-    glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 0, rayBuffer_ID );
-    glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 1, triangleBuffer_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 2, bvhBuffer_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 3, materialsBuffer_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 4, texturesBuffer_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 5, textureInfosBuffer_ID );
+     glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 0, screenBuffer_ID );
+    glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 1, rayBuffer_ID );
+    glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 2, triangleBuffer_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 3, bvhBuffer_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 4, materialsBuffer_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 5, texturesBuffer_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 6, textureInfosBuffer_ID );
 }
 
 void Scene::BuildBVHTree()
