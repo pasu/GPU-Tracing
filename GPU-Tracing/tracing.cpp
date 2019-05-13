@@ -74,13 +74,43 @@ int main()
     ////////////////////////////////////////////////////////////////////
     // create scene
 	int idx_texture = gTexManager.CreateTexture( "./data/Wood_Tower_Col.jpg" );
-	int idx_material = gMaterialManager.CreateMaterial( vec3( 1 ), vec3( 0 ), DIFFUSE_AND_REFLECTIVE,
+	int idx_material = gMaterialManager.CreateMaterial( vec3( 1 ), vec3( 0 ), DIFFUSE,
         0.0f, 2.5f,
         idx_texture,
         2.0f,0.0f);
 
     Scene scene;
-	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0, 0, -10 ) );
+	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0, -10, -15 ), vec3( 20.0f, 0.0f, 0.0f ) );
+
+    idx_texture = gTexManager.CreateTexture( "./data/BeachStones.jpg" );
+    idx_material = gMaterialManager.CreateMaterial( vec3( 1), vec3( 0 ), DIFFUSE,
+														0.0f, 2.5f,
+													    idx_texture,
+														2.0f, 0.0f );
+	float y = 10.5;
+	float z = -50;
+	scene.addTriangle( vec3( -50, y, 0 ), vec3( -50, y, z ), vec3( 50, y, z ), idx_material,
+					   vec3( 0, 1, 0 ), vec3( 0, 1, 0 ), vec3( 0, 1, 0 ),
+					   vec2( 0, 0 ), vec2( 0, 1 ), vec2( 1, 1 ) );
+	scene.addTriangle( vec3( -50, y, 0 ), vec3( 50, y, z ), vec3( 50, y, 0 ), idx_material,
+					   vec3( 0, 1, 0 ), vec3( 0, 1, 0 ), vec3( 0, 1, 0 ),
+					   vec2( 0, 0 ), vec2( 1, 1 ), vec2( 1, 0 ) );
+
+    idx_material = gMaterialManager.CreateMaterial( vec3( 1, 0, 0 ), vec3( 1, 1, 1 ), DIFFUSE,
+													0.0f, 2.5f,
+													-1,
+													2.0f, 0.0f );
+
+    float x = -8;
+	y = 5;
+	z = -12;
+	float offset = 0.1;
+
+    scene.addAreaLight( vec3( x, y, z ), vec3( x, y - offset, z ),
+						vec3( x, y - offset, z - offset ), vec3( x, y, z - offset ), idx_material, vec3( -1, 0, 0 ) );
+
+
+
 	/*
 	float z = -800;
 	float w = 100;
@@ -93,10 +123,12 @@ int main()
     */
 	// SSAO
 	GLuint screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
-        materialsBuffer_ID, texturesBuffer_ID,textureInfosBuffer_ID;
+        materialsBuffer_ID, texturesBuffer_ID,textureInfosBuffer_ID,
+		lightsBuffer_ID,lightsNumBuffer_ID;
 
 	scene.buffer2GPU( screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
-        materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID );
+        materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID, 
+        lightsBuffer_ID, lightsNumBuffer_ID );
 	
 	GLuint genRay_SID = loadcomputeshader( "./shader/genRay.glsl" );
 	////////////////////////////////////////////////////////////////////

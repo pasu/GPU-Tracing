@@ -42,15 +42,30 @@ void Scene::addMesh( const char *mesh_File, const int &materialIndex, const vec3
 	pM = NULL;
 }
 
-void Scene::addTriangle( const vec3 &v1, const vec3 &v2, const vec3 &v3, const vec3 &n1, const vec3 &n2, const vec3 &n3, const vec2 &t1, const vec2 &t2, const vec2 &t3, const int &materialIndex )
+void Scene::addTriangle( const vec3 &v1, const vec3 &v2, const vec3 &v3, const int &materialIndex, const vec3 &n1, const vec3 &n2, const vec3 &n3, const vec2 &t1, const vec2 &t2, const vec2 &t3 )
 {
 	arrTriangles.push_back( RTTriangle(v1,v2,v3,n1,n2,n3,t1,t2,t3, materialIndex) );
+}
+
+void Scene::addAreaLight( const vec3 &v1, const vec3 &v2, const vec3 &v3, const vec3 &v4, const int &materialIndex, const vec3 &normal )
+{
+	vec2 t = vec2( 0 );
+	arrTriangles.push_back( RTTriangle( v1, v2, v3, normal, normal, normal, t, t, t, materialIndex ) );
+	arrTriangles.push_back( RTTriangle( v1, v3, v4, normal, normal, normal, t, t, t, materialIndex ) );
+
+    mLightBoundary.push_back( vec4( v1 ,1) );
+	mLightBoundary.push_back( vec4( v2, 1 ) );
+	mLightBoundary.push_back( vec4( v3, 1 ) );
+	mLightBoundary.push_back( vec4( v4, 1 ) );
+	mLightBoundary.push_back( vec4( normal, 1 ) );
 }
 
 void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &triangleBuffer_ID, GLuint &bvhBuffer_ID,
 						GLuint &materialsBuffer_ID,
 						GLuint &texturesBuffer_ID,
-						GLuint &textureInfosBuffer_ID)
+						GLuint &textureInfosBuffer_ID,
+						GLuint &lightsBuffer_ID,
+                        GLuint &lightsNumBuffer_ID )
 {
 	BuildBVHTree();
 
@@ -92,13 +107,24 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, textureInfosBuffer_ID );
 	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( RTTexInfo ) * texInfos.size(), &texInfos[0], GL_STATIC_DRAW );
 
-     glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 0, screenBuffer_ID );
+    glGenBuffers( 1, &lightsBuffer_ID );
+	glBindBuffer( GL_SHADER_STORAGE_BUFFER, lightsBuffer_ID );
+	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( vec4 ) * mLightBoundary.size(), &mLightBoundary[0], GL_STATIC_DRAW );
+
+    int light_num = mLightBoundary.size() / 5;
+    glGenBuffers( 1, &lightsNumBuffer_ID );
+	glBindBuffer( GL_SHADER_STORAGE_BUFFER, lightsNumBuffer_ID );
+	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( int ), &light_num, GL_STATIC_DRAW );
+
+    glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 0, screenBuffer_ID );
     glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 1, rayBuffer_ID );
     glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 2, triangleBuffer_ID );
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 3, bvhBuffer_ID );
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 4, materialsBuffer_ID );
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 5, texturesBuffer_ID );
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 6, textureInfosBuffer_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 7, lightsBuffer_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 8, lightsNumBuffer_ID );
 }
 
 void Scene::BuildBVHTree()
