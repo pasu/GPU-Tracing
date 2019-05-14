@@ -71,43 +71,45 @@ int main()
 	double lastTime = glfwGetTime();
 
     glm:mat4 modelViewMatrix = glm::mat4( 1.0 );
+    mat4 lastMatrix = glm::mat4( 1.0 );
     ////////////////////////////////////////////////////////////////////
     // create scene
 	int idx_texture = gTexManager.CreateTexture( "./data/Wood_Tower_Col.jpg" );
+	
 	int idx_material = gMaterialManager.CreateMaterial( vec3( 1 ), vec3( 0 ), DIFFUSE,
         0.0f, 2.5f,
         idx_texture,
         2.0f,0.0f);
 
     Scene scene;
-	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0, -10, -15 ), vec3( 20.0f, 0.0f, 0.0f ) );
+	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0,0,0), vec3( 3.1415f/2.0f, 0.0f, 0.0f ) );
 
     idx_texture = gTexManager.CreateTexture( "./data/BeachStones.jpg" );
     idx_material = gMaterialManager.CreateMaterial( vec3( 1), vec3( 0 ), DIFFUSE,
 														0.0f, 2.5f,
 													    idx_texture,
 														2.0f, 0.0f );
-	float y = 10.5;
-	float z = -50;
+	float y = 0.5;
+	float z = 20;
 	scene.addTriangle( vec3( -50, y, 0 ), vec3( -50, y, z ), vec3( 50, y, z ), idx_material,
-					   vec3( 0, 1, 0 ), vec3( 0, 1, 0 ), vec3( 0, 1, 0 ),
+					   vec3( 0, -1, 0 ), vec3( 0, -1, 0 ), vec3( 0, -1, 0 ),
 					   vec2( 0, 0 ), vec2( 0, 1 ), vec2( 1, 1 ) );
 	scene.addTriangle( vec3( -50, y, 0 ), vec3( 50, y, z ), vec3( 50, y, 0 ), idx_material,
-					   vec3( 0, 1, 0 ), vec3( 0, 1, 0 ), vec3( 0, 1, 0 ),
+					   vec3( 0, -1, 0 ), vec3( 0, -1, 0 ), vec3( 0, -1, 0 ),
 					   vec2( 0, 0 ), vec2( 1, 1 ), vec2( 1, 0 ) );
 
-    idx_material = gMaterialManager.CreateMaterial( vec3( 1, 0, 0 ), vec3( 1, 1, 1 ), DIFFUSE,
+    idx_material = gMaterialManager.CreateMaterial( vec3( 1, 0, 0 ), vec3( 500 ), DIFFUSE,
 													0.0f, 2.5f,
 													-1,
 													2.0f, 0.0f );
 
-    float x = -8;
-	y = 5;
-	z = -12;
-	float offset = 0.1;
+    float x = -3;
+	y = -20;
+	z = -20;
+	float offset = 5.5;
 
-    scene.addAreaLight( vec3( x, y, z ), vec3( x, y - offset, z ),
-						vec3( x, y - offset, z - offset ), vec3( x, y, z - offset ), idx_material, vec3( -1, 0, 0 ) );
+    scene.addAreaLight( vec3( x, y, z ), vec3( x, y, z - offset ),
+						vec3( x + offset, y, z - offset ), vec3( x + offset, y, z ), idx_material, vec3( 0, 1, 0 ) );
 
 
 
@@ -181,6 +183,12 @@ int main()
         updateCamera( *camera );
 		camera->copyMCamera( modelViewMatrix );
 		modelViewMatrix = glm::transpose( modelViewMatrix );
+
+        if ( lastMatrix != modelViewMatrix )
+        {
+			lastMatrix = modelViewMatrix;
+			frame_id = 0;
+        }
 
 		auto start = std::chrono::system_clock::now();
 

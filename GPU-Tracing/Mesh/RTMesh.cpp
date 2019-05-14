@@ -43,6 +43,8 @@ void RTMesh::applyTransforms()
 
     modelMatrix = glm::scale( modelMatrix, scale );
 
+    computeNormalMatrix();
+
     const aiScene *scene = importer->GetScene();
 	for ( unsigned int meshI = 0; meshI < scene->mNumMeshes; ++meshI )
 	{
