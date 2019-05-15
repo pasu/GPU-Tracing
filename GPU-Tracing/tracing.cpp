@@ -91,14 +91,14 @@ int main()
 														2.0f, 0.0f );
 	float y = 0.5;
 	float z = 20;
-	scene.addTriangle( vec3( -50, y, 0 ), vec3( -50, y, z ), vec3( 50, y, z ), idx_material,
+	scene.addTriangle( vec3( 50, y, z ), vec3( -50, y, z ), vec3( -50, y, 0 ), idx_material,
 					   vec3( 0, -1, 0 ), vec3( 0, -1, 0 ), vec3( 0, -1, 0 ),
 					   vec2( 0, 0 ), vec2( 0, 1 ), vec2( 1, 1 ) );
-	scene.addTriangle( vec3( -50, y, 0 ), vec3( 50, y, z ), vec3( 50, y, 0 ), idx_material,
+	scene.addTriangle( vec3( 50, y, 0 ), vec3( 50, y, z ), vec3( -50, y, 0 ), idx_material,
 					   vec3( 0, -1, 0 ), vec3( 0, -1, 0 ), vec3( 0, -1, 0 ),
 					   vec2( 0, 0 ), vec2( 1, 1 ), vec2( 1, 0 ) );
 
-    idx_material = gMaterialManager.CreateMaterial( vec3( 1, 0, 0 ), vec3( 500 ), DIFFUSE,
+    idx_material = gMaterialManager.CreateMaterial( vec3( 1, 0, 0 ), vec3( 900 ), DIFFUSE,
 													0.0f, 2.5f,
 													-1,
 													2.0f, 0.0f );
@@ -178,6 +178,7 @@ int main()
     /////////////////////////////////////////////////////////
 	while ( !glfwWindowShouldClose( window ) )
 	{
+		auto start = clock();
 		static unsigned int frame_id = 0;
 
         updateCamera( *camera );
@@ -189,8 +190,6 @@ int main()
 			lastMatrix = modelViewMatrix;
 			frame_id = 0;
         }
-
-		auto start = std::chrono::system_clock::now();
 
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
@@ -222,9 +221,9 @@ int main()
 
 		glDisableVertexAttribArray( 0 );
 
-		auto end = std::chrono::system_clock::now();
-		std::chrono::duration<double> diff = end - start;
-		//cout << diff.count() << endl;
+		auto end = clock();
+		double diff = end - start;
+		cout << 1000.0 / diff << endl;
 
 		processInput( window );
 		glfwSwapBuffers( window );

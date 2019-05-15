@@ -139,7 +139,7 @@ uint HALF_SCRWIDTH = 400u;
 
 const float very_large_float = 1e9f;
 const float very_small_float = 1e-9f;
-const uint SAMPLE_NUM = 16u;
+const uint SAMPLE_NUM = 16u * 16u;
 
 const vec4 color_scene = vec4( 0.13f,1,1,0 );
 
@@ -397,17 +397,17 @@ void getSurfaceData(RTRay ray, RTIntersection intersection, out SurfaceData hitP
     vec3 tv1 = vec3( tri.vertices0_0, tri.vertices0_1, tri.vertices0_2 );
 	vec3 tv2 = vec3( tri.vertices1_0, tri.vertices1_1, tri.vertices1_2 );
 	vec3 tv3 = vec3( tri.vertices2_0, tri.vertices2_1, tri.vertices2_2 );
-	/*
+	
     vec3 dir_x = tv2 - tv1;
 	vec3 dir_y = tv3 - tv1;
-
+	
     vec3 normalR = cross( dir_x, dir_y );
 	hitPnt.normal = normalize( normalR );
-    */
+	/*
     hitPnt.normal = normalize( vec3( tri.normals0_0 + intersection.u * ( tri.normals1_0 - tri.normals0_0 ) + intersection.v * ( tri.normals2_0 - tri.normals0_0 ),
 									 tri.normals0_1 + intersection.u * ( tri.normals1_1 - tri.normals0_1 ) + intersection.v * ( tri.normals2_1 - tri.normals0_1 ),
 									 tri.normals0_2 + intersection.u * ( tri.normals1_2 - tri.normals0_1 ) + intersection.v * ( tri.normals2_2 - tri.normals0_2 ) ) );
-
+    */                     
     float areaABC, areaPBC, areaPCA;
 	Barycentric( hitPnt.position, tv1,tv2,tv3,
 				 areaABC, areaPBC, areaPCA );
