@@ -67,12 +67,12 @@ void updateTranslation(RTCamera& camera)
 
 	if ( glfwGetKey( window, GLFW_KEY_Q ) == GLFW_PRESS )
 	{
-		camera.moveUp( moving_speed );
+		camera.moveUp( -moving_speed );
 	}
 
 	if ( glfwGetKey( window, GLFW_KEY_E ) == GLFW_PRESS )
 	{
-		camera.moveUp( -moving_speed );
+		camera.moveUp( moving_speed );
 	}
 }
 

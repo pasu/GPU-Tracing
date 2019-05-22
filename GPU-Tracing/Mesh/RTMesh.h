@@ -35,7 +35,7 @@ class RTMesh
 		inline void computeNormalMatrix()
 		{
 			normalMatrix = glm::inverse( modelMatrix );
-			//normalMatrix = glm::transpose( normalMatrix );
+			normalMatrix = glm::transpose( normalMatrix );
 		};
 
     private:

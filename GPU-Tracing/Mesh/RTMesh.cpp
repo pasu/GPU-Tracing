@@ -98,6 +98,11 @@ void RTMesh::getTriangles( vector<RTTriangle *> &triangleList )
 			normals[1] = vec3( nb.x, nb.y, nb.z );
 			normals[2] = vec3( nc.x, nc.y, nc.z );
 
+            vec3 dir_x = vertices[1] - vertices[0];
+			vec3 dir_y = vertices[2] - vertices[0];
+
+            vec3 normal = glm::cross( dir_x, dir_y );
+
 			if ( mesh->mTextureCoords[0] != NULL )
 			{
 				aiVector3D &ta = mesh->mTextureCoords[0][faces[faceI].mIndices[0]];
