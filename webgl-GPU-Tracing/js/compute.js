@@ -97,6 +97,11 @@ function equal (buf1, buf2)
 
 function main() {  
   var canvas = document.getElementById('webgl');
+  var stats = new Stats();
+
+  var container = document.createElement( 'div' );
+  document.body.appendChild( container );
+  container.appendChild( stats.dom );
 
   var context = canvas.getContext('webgl2-compute', {antialias: false});
   if (!context) {
@@ -204,6 +209,8 @@ function main() {
         0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
         0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
         context.COLOR_BUFFER_BIT, context.NEAREST);
+
+      stats.update();
 
       window.requestAnimationFrame(tick, canvas);
     }
