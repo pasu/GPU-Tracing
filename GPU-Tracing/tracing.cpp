@@ -82,7 +82,7 @@ int main()
         2.0f,0.0f);
 
     Scene scene;
-	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0,0,0), vec3( 3.1415f/2.0f, 0.0f, 0.0f ) );
+	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0,0.25,-5), vec3( 3.1415f/2.0f, 0.0f, 0.0f ) );
 
     idx_texture = gTexManager.CreateTexture( "./data/BeachStones.jpg" );
     idx_material = gMaterialManager.CreateMaterial( vec3( 1), vec3( 0 ), DIFFUSE,
@@ -133,6 +133,8 @@ int main()
         materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID, 
         lightsBuffer_ID, lightsNumBuffer_ID );
 	
+    //scene.savebuffer("D://code//GPU-Tracing//scene");
+
 	GLuint genRay_SID = loadcomputeshader( "./shader/genRay.glsl" );
 	////////////////////////////////////////////////////////////////////
     // hit with Ray

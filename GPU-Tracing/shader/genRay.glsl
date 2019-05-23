@@ -41,7 +41,7 @@ vec4 randomDirection()
 void primaryRay( in uint x, in uint y, out RTRay ray )
 {
 	ray.pos = vec4( mvMatrix * vec4( 0, 0, 0, 1 ) );
-    ray.dir = normalize( vec4( mvMatrix * vec4( vec3( float( x ) + xorshift32(), float( SCRWIDTH - y ) + xorshift32(), 0 ) - vec3( HALF_SCRWIDTH ), 1 ) ) - ray.pos );
+	ray.dir = normalize( vec4( mvMatrix * vec4( vec3( float( x ) + xorshift32(), float( SCRWIDTH - y ) + xorshift32(), 0 ) - vec3( HALF_SCRWIDTH ), 1 ) ) - ray.pos );
 }
 
 void main()
@@ -53,7 +53,6 @@ void main()
 	uint largePrime3 = 101414101u;
 
 	random_seed = ( ( uint( storePos.x ) * largePrime1 + uint( storePos.y ) ) * largePrime1 + frame_id * largePrime3 );
-
 	int idx = storePos.y * int( SCRWIDTH ) + storePos.x;
 	primaryRay( gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rays[idx] );
 }

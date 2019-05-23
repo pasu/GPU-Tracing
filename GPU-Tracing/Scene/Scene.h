@@ -28,6 +28,8 @@ class Scene
 					 GLuint &lightsBuffer_ID,
 					 GLuint &lightsNumBuffer_ID );
 
+    void savebuffer(const char* path);
+
     private:
 	    void BuildBVHTree();
   private:

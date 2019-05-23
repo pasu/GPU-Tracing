@@ -37,9 +37,10 @@ void RTMesh::applyTransforms()
 	rotateXYZ = glm::rotate( rotateXYZ, rotation.y, glm::vec3( 0.0f, 1.0f, 0.0f ) );
 	rotateXYZ = glm::rotate( rotateXYZ, rotation.z, glm::vec3( 0.0f, 0.0f, 1.0f ) );
 
-	modelMatrix = modelMatrix * rotateXYZ;
+	//modelMatrix = modelMatrix * rotateXYZ;
 
-    modelMatrix = glm::translate( modelMatrix, pos );
+    modelMatrix = glm::translate( glm::mat4( 1.0f ), pos );
+	modelMatrix = modelMatrix * rotateXYZ;
 
     modelMatrix = glm::scale( modelMatrix, scale );
 

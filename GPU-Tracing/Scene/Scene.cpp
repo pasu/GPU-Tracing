@@ -127,6 +127,71 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 8, lightsNumBuffer_ID );
 }
 
+void Scene::savebuffer( const char *path )
+{
+	string path_file = path;
+
+    string strName = "triangles.bin";
+	strName = path_file + "//" + strName;
+	FILE *file = fopen( strName.c_str(), "wb" );
+
+	fwrite( &arrTriangles[0], sizeof( RTTriangle ), arrTriangles.size(), file );
+	fclose( file );
+
+    strName = "bvh.bin";
+	strName = path_file + "//" + strName;
+	file = fopen( strName.c_str(), "wb" );
+
+	fwrite( mBTree->bvhTree, sizeof( BVHNode_32 ), mBTree->getNodesCount(), file );
+	fclose( file );
+
+    RTMaterial *pMaterial = NULL;
+	int nSize = gMaterialManager.getMaterialList( pMaterial );
+
+    strName = "material.bin";
+	strName = path_file + "//" + strName;
+	file = fopen( strName.c_str(), "wb" );
+
+	fwrite( pMaterial, sizeof( RTMaterial ), nSize, file );
+	fclose( file );
+
+    vector<RTTexInfo> texInfos;
+	unsigned char *fBuffer = NULL;
+	nSize = gTexManager.generateTexInfoWithBuffer( texInfos, fBuffer );
+
+    strName = "texture.bin";
+	strName = path_file + "//" + strName;
+	file = fopen( strName.c_str(), "wb" );
+
+	fwrite( fBuffer, 1, nSize, file );
+	fclose( file );
+
+    delete fBuffer;
+	fBuffer = NULL;
+
+    strName = "texIn.bin";
+	strName = path_file + "//" + strName;
+	file = fopen( strName.c_str(), "wb" );
+
+	fwrite( &texInfos[0], sizeof( RTTexInfo ), texInfos.size(), file );
+	fclose( file );
+
+    strName = "lights.bin";
+	strName = path_file + "//" + strName;
+	file = fopen( strName.c_str(), "wb" );
+
+	fwrite( &mLightBoundary[0], sizeof( vec4 ), mLightBoundary.size(), file );
+	fclose( file );
+
+    int light_num = mLightBoundary.size() / 5;
+    strName = "lights_num.bin";
+	strName = path_file + "//" + strName;
+	file = fopen( strName.c_str(), "wb" );
+
+	fwrite( &light_num, sizeof( int ), 1, file );
+	fclose( file );
+}
+
 void Scene::BuildBVHTree()
 {
 	if ( mBTree )
