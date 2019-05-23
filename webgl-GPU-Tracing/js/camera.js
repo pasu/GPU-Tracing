@@ -178,10 +178,10 @@ function walk_callback(canvas,camera){
                 camera.moveLeft( -moving_speed );
                 break;
             case 81: // Q
-                camera.moveUp( moving_speed );
+                camera.moveUp( -moving_speed );
                 break;
             case 69: // E
-                camera.moveUp( -moving_speed );
+                camera.moveUp( moving_speed );
                 break;
             default: break;
         }
