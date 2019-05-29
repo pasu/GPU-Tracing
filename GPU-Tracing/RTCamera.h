@@ -150,12 +150,6 @@ class RTCamera
 			eye.z = position.z;
 
 			vec4 aixX = mRotation * vec4( 1.0f, 0.0f, 0.0f, 0.0f );
-			vec4 aixX2 = vec4( 1.0f, 0.0f, 0.0f, 0.0f ) * mRotation;
-
-			if ( aixX2 != aixX )
-			{
-				std::cout << "yes" << std::endl;
-			}
 			vec4 aixY = mRotation * vec4( 0.0f, 1.0f, 0.0f, 0.0f );
 			vec4 aixZ = mRotation * vec4( 0.0f, 0.0f, 1.0f, 0.0f );
 
