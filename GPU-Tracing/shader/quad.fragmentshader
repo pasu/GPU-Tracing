@@ -12,4 +12,5 @@ void main()
 
 	// Output color = red 
 	color = vec4(texture(texture_dds, uv).rgb,0.9);
+
 }

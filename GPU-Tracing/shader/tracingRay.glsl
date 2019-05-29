@@ -2,12 +2,12 @@
 layout( local_size_x = 32, local_size_y = 4, local_size_z = 1 ) in;
 layout( rgba8, binding = 0 ) writeonly uniform highp image2D destTex;
 
+//All SSBO should copy from ssbo.glsl
+///////////////////////////////////////////////
 layout( std430, binding = 0 ) buffer SCREEN_BUFFER
 {
 	vec4 colors[];
 };
-uniform uint frame_id;
-uniform mat4 mvMatrix;
 
 struct RTRay
 {
@@ -131,6 +131,77 @@ layout( std430, binding = 8 ) buffer LIGHT_NUM_BUFFER
 {
 	int light_num;
 };
+
+struct RenderParameters
+{
+	uint nTaskNum;
+	uint nWidth;
+	uint nHeight;
+	uint nMaxBounces;
+};
+
+layout( std430, binding = 9 ) buffer RenderParameters_BUFFER
+{
+	RenderParameters rp;
+};
+
+struct wf_PathState
+{
+	vec3 indirect_pos;
+	float pre_pdf_hemi_brdf;
+
+	vec3 indirect_dir;
+	float light_weight;
+
+	vec4 final_color; // w: iteration number
+
+	vec3 shadow_pos;
+	uint pixelIdx;
+
+	vec3 shadow_dir;
+};
+
+layout( std430, binding = 10 ) buffer PathState_BUFFER
+{
+	wf_PathState ps[];
+};
+
+struct wf_queue_counter
+{
+	uint raygenQueue;
+	uint extentionQueue;
+	uint shadowQueue;
+	uint bump;
+};
+
+layout( std430, binding = 11 ) buffer QueueCounter_BUFFER
+{
+	wf_queue_counter qc[];
+};
+
+layout( std430, binding = 12 ) buffer genQueue_BUFFER
+{
+	uint genQueue[];
+};
+
+layout( std430, binding = 13 ) buffer materialQueue_BUFFER
+{
+	uint materialQueue[];
+};
+
+layout( std430, binding = 14 ) buffer ExtensionQueue_BUFFER
+{
+	uint extensionQueue[];
+};
+
+layout( std430, binding = 15 ) buffer ShadowQueue_BUFFER
+{
+	uint shadowQueue[];
+};
+///////////////////////////////////////////////
+
+uniform uint frame_id;
+uniform mat4 mvMatrix;
 
 uint random_seed;
 uint SCRWIDTH = 800u;
@@ -834,8 +905,8 @@ void main()
 	{
 		uint count = frame_id + 1u;
 		colors[idx] = ( colors[idx] * float( frame_id ) + pixel ) * ( 1.0f / float( count ) ); //( colors[idx] * float( frame_id ) + pixel ) * ( 1.0f / float( frame_id + 1 ) );
-		colors[idx].w = 1.0f;
+		
 	}
-
+	colors[idx].w = 1.0f;
 	imageStore( destTex, storePos, colors[idx] );
 }

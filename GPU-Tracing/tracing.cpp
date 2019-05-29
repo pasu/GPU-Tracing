@@ -1,7 +1,7 @@
 ﻿//
 #include "pch.h"
+#include "textrenderer/textrenderer.h"
 #include <iostream>
-
 GLFWwindow *window;
 
 #include <glm/glm.hpp>
@@ -22,9 +22,8 @@ using namespace glm;
 #include "./DS/datastructure.h"
 #include "./Scene/Scene.h"
 
-#include "./Material/RTTextureManager.h"
 #include "./Material/RTMaterialManager.h"
-
+#include "./Material/RTTextureManager.h"
 
 RTTextureManager gTexManager;
 RTMaterialManager gMaterialManager;
@@ -70,49 +69,48 @@ int main()
 
 	double lastTime = glfwGetTime();
 
-    glm:mat4 modelViewMatrix = glm::mat4( 1.0 );
-    mat4 lastMatrix = glm::mat4( 1.0 );
-    ////////////////////////////////////////////////////////////////////
-    // create scene
+glm:
+	mat4 modelViewMatrix = glm::mat4( 1.0 );
+	mat4 lastMatrix = glm::mat4( 1.0 );
+	////////////////////////////////////////////////////////////////////
+	// create scene
 	int idx_texture = gTexManager.CreateTexture( "./data/Wood_Tower_Col.jpg" );
-	
+
 	int idx_material = gMaterialManager.CreateMaterial( vec3( 1 ), vec3( 0 ), DIFFUSE,
-        0.0f, 2.5f,
-        idx_texture,
-        2.0f,0.0f);
-
-    Scene scene;
-	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0,0.25,-5), vec3( 3.1415f/2.0f, 0.0f, 0.0f ) );
-
-    idx_texture = gTexManager.CreateTexture( "./data/BeachStones.jpg" );
-    idx_material = gMaterialManager.CreateMaterial( vec3( 1), vec3( 0 ), DIFFUSE,
 														0.0f, 2.5f,
-													    idx_texture,
+														idx_texture,
 														2.0f, 0.0f );
+
+	Scene scene;
+	scene.addMesh( "./data/wooden.dae", idx_material, vec3( 0, 0.25, -5 ), vec3( 3.1415f / 2.0f, 0.0f, 0.0f ) );
+
+	idx_texture = gTexManager.CreateTexture( "./data/BeachStones.jpg" );
+	idx_material = gMaterialManager.CreateMaterial( vec3( 1 ), vec3( 0 ), DIFFUSE,
+													0.0f, 2.5f,
+													idx_texture,
+													2.0f, 0.0f );
 	float y = 0.5;
 	float z = 15;
 	float width = 30;
-	scene.addTriangle( vec3( 50, y, z ), vec3( -50, y, z ), vec3( -50, y, z-width ), idx_material,
+	scene.addTriangle( vec3( 50, y, z ), vec3( -50, y, z ), vec3( -50, y, z - width ), idx_material,
 					   vec3( 0, -1, 0 ), vec3( 0, -1, 0 ), vec3( 0, -1, 0 ),
 					   vec2( 0, 0 ), vec2( 0, 1 ), vec2( 1, 1 ) );
 	scene.addTriangle( vec3( 50, y, z - width ), vec3( 50, y, z ), vec3( -50, y, z - width ), idx_material,
 					   vec3( 0, -1, 0 ), vec3( 0, -1, 0 ), vec3( 0, -1, 0 ),
 					   vec2( 0, 0 ), vec2( 1, 1 ), vec2( 1, 0 ) );
 
-    idx_material = gMaterialManager.CreateMaterial( vec3( 1, 0, 0 ), vec3( 300 ), DIFFUSE,
+	idx_material = gMaterialManager.CreateMaterial( vec3( 1, 0, 0 ), vec3( 300 ), DIFFUSE,
 													0.0f, 2.5f,
 													-1,
 													2.0f, 0.0f );
 
-    float x = -3;
+	float x = -10;
 	y = -20;
-	z = 20;
+	z = 5;
 	float offset = 5.5;
 
-    scene.addAreaLight( vec3( x, y, z ), vec3( x, y, z - offset ),
+	scene.addAreaLight( vec3( x, y, z ), vec3( x, y, z - offset ),
 						vec3( x + offset, y, z - offset ), vec3( x + offset, y, z ), idx_material, vec3( 0, 1, 0 ) );
-
-
 
 	/*
 	float z = -800;
@@ -125,26 +123,26 @@ int main()
 	scene.addTriangle( v1, v3, v4 );
     */
 	// SSAO
-	GLuint screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
-        materialsBuffer_ID, texturesBuffer_ID,textureInfosBuffer_ID,
-		lightsBuffer_ID,lightsNumBuffer_ID;
+	GLuint screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID,
+		materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID,
+		lightsBuffer_ID, lightsNumBuffer_ID;
 
-	scene.buffer2GPU( screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID, 
-        materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID, 
-        lightsBuffer_ID, lightsNumBuffer_ID );
-	
-    //scene.savebuffer("D://code//GPU-Tracing//scene");
+	scene.buffer2GPU( screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID,
+					  materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID,
+					  lightsBuffer_ID, lightsNumBuffer_ID );
+
+	scene.savebuffer( "D://code//GPU-Tracing//scene" );
 
 	GLuint genRay_SID = loadcomputeshader( "./shader/genRay.glsl" );
 	////////////////////////////////////////////////////////////////////
-    // hit with Ray
+	// hit with Ray
 	GLuint texHandle = genTexture();
 	GLuint tracing_SID = loadcomputeshader( "./shader/tracingRay.glsl" );
 	///////////////////////////////////////////////////////////////////////
 
 	GLuint quad_ID = loadshaders( "./shader/quad.vertexshader", "./shader/quad.fragmentshader" );
 	GLuint _qtextureID = glGetUniformLocation( quad_ID, "texture_dds" );
-	// The fullscreen quad's FBO
+	// The full screen quad's FBO
 	static const GLfloat g_quad_vertex_buffer_data[] = {
 		-1.0f,
 		-1.0f,
@@ -175,24 +173,24 @@ int main()
 	glBindBuffer( GL_ARRAY_BUFFER, quad_vertexbuffer );
 	glBufferData( GL_ARRAY_BUFFER, sizeof( g_quad_vertex_buffer_data ), g_quad_vertex_buffer_data, GL_STATIC_DRAW );
 
-    ////////////////////////////////////////////////////////
-	RTCamera* camera = new RTCamera;
+	////////////////////////////////////////////////////////
+	RTCamera *camera = new RTCamera;
 	setCameraSpeed( 0.1 );
-    /////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////
 	while ( !glfwWindowShouldClose( window ) )
 	{
 		auto start = clock();
 		static unsigned int frame_id = 0;
 
-        updateCamera( *camera );
+		updateCamera( *camera );
 		camera->copyMCamera( modelViewMatrix );
-		modelViewMatrix = glm::transpose( modelViewMatrix );
+		//modelViewMatrix = glm::inverse( modelViewMatrix );
 
-        if ( lastMatrix != modelViewMatrix )
-        {
+		if ( lastMatrix != modelViewMatrix )
+		{
 			lastMatrix = modelViewMatrix;
 			frame_id = 0;
-        }
+		}
 
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
@@ -212,6 +210,7 @@ int main()
 
 		glUseProgram( quad_ID );
 
+		glBindVertexArray( vao );
 		glActiveTexture( GL_TEXTURE0 );
 		glBindTexture( GL_TEXTURE_2D, texHandle );
 		glUniform1i( _qtextureID, 0 );
@@ -226,9 +225,11 @@ int main()
 
 		auto end = clock();
 		double diff = end - start;
-		cout << 1000.0 / diff << endl;
-
+		//cout << 1000.0 / diff << endl;
+		float fps = 1000.0 / diff;
 		processInput( window );
+
+		qp::renderText( std::to_string( fps ) + " fps", 5, 20, 20, {0.5,0.5,0.5} );
 		glfwSwapBuffers( window );
 		glfwPollEvents();
 	}

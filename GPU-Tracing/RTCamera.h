@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pch.h"
 #include "Utils.h"
+#include "pch.h"
 #include "shared.h"
 
 #include <glm/glm.hpp>
@@ -9,13 +9,14 @@
 #include <glm/gtx/norm.hpp>
 using namespace glm;
 
+#include <iostream>
+
 const glm::mat4 identityM = glm::mat4( 1.0 );
 
 class RTCamera
 {
   public:
-
-    float speed;
+	float speed;
 
 	vec3 getEye()
 	{
@@ -26,7 +27,7 @@ class RTCamera
 		eye = e;
 	}
 
-	void setFov(const float& angle)
+	void setFov( const float &angle )
 	{
 		float y = 1.0f;
 		float x = tan( angle / Utils::RT_PI );
@@ -47,7 +48,7 @@ class RTCamera
 		heading = .0f;
 		pitch = .0f;
 		bUpdate = true;
-        _moved_ = true;
+		_moved_ = true;
 		position = vec4( 0 );
 		position.w = 1.0f;
 
@@ -57,8 +58,8 @@ class RTCamera
 		// depth field
 		float factor = 0.1f;
 		aperture = 0;
-		d = factor*SCRWIDTH / 2;
-		viewplane_size = factor*SCRWIDTH;
+		d = factor * SCRWIDTH / 2;
+		viewplane_size = factor * SCRWIDTH;
 
 		viewplane_center = eye + (float)d * ahead;
 		pixel_size = (float)( viewplane_size / (float)SCRWIDTH );
@@ -76,66 +77,71 @@ class RTCamera
 	void updateRotationMatrix()
 	{
 		mat4 mHeading, mPitch;
-		
+
 		mHeading = glm::rotate( identityM, heading, glm::vec3( 0.0f, 1.0f, 0.0f ) );
 		mPitch = glm::rotate( identityM, pitch, glm::vec3( 1.0f, 0.0f, 0.0f ) );
 
-		mRotation = mHeading* mPitch;
+		mRotation = mHeading * mPitch;
 		bUpdate = true;
 	}
 
-	void turnLeft(float rad) 
+	void turnLeft( float rad )
 	{
-        if (abs(rad) > 0.000001) {
-            _moved_ = true;
-        }
-		heading += rad;
+		if ( abs( rad ) > 0.000001 )
+		{
+			_moved_ = true;
+		}
+		heading -= rad;
 		updateRotationMatrix();
 	}
 	void turnUp( float rad )
 	{
-        if (abs(rad) > 0.000001) {
-            _moved_ = true;
-        }
+		if ( abs( rad ) > 0.000001 )
+		{
+			_moved_ = true;
+		}
 		pitch += rad;
 		pitch = std::max( pitch, -1.57f );
 		pitch = std::min( pitch, 1.57f );
 		updateRotationMatrix();
 	}
-	void moveForward(float d)
+	void moveForward( float d )
 	{
-        if (abs(d) > 0.000001) {
-            _moved_ = true;
-        }
-		vec4 localD( 0.0f, 0.0f, d, 1.0f );
+		if ( abs( d ) > 0.000001 )
+		{
+			_moved_ = true;
+		}
+		vec4 localD( 0.0f, 0.0f, -d, 1.0f );
 
 		vec4 globalD = glm::rotate( identityM, heading, glm::vec3( 0.0f, 1.0f, 0.0f ) ) * localD;
 		position.x += globalD.x;
-		position.z -= globalD.z;
+		position.z += globalD.z;
 		bUpdate = true;
 	}
 	void moveLeft( float d )
 	{
-        if (abs(d) > 0.000001) {
-            _moved_ = true;
-        }
+		if ( abs( d ) > 0.000001 )
+		{
+			_moved_ = true;
+		}
 		vec4 localD( -d, 0.0f, 0.0f, 1.0f );
 		vec4 globalD = glm::rotate( identityM, heading, glm::vec3( 0.0f, 1.0f, 0.0f ) ) * localD;
 		position.x += globalD.x;
-		position.z -= globalD.z;
+		position.z += globalD.z;
 		bUpdate = true;
 	}
 	void moveUp( float d )
 	{
-        if (abs(d) > 0.000001) {
-            _moved_ = true;
-        }
+		if ( abs( d ) > 0.000001 )
+		{
+			_moved_ = true;
+		}
 		position.y += d;
 		bUpdate = true;
 	}
 	void Update()
 	{
-		
+
 		if ( bUpdate )
 		{
 
@@ -143,9 +149,15 @@ class RTCamera
 			eye.y = position.y;
 			eye.z = position.z;
 
-			vec4 aixX = vec4( 1.0f, 0.0f, 0.0f, 0.0f ) * mRotation;
-			vec4 aixY = vec4( 0.0f, 1.0f, 0.0f, 0.0f ) * mRotation;
-			vec4 aixZ = vec4( 0.0f, 0.0f, 1.0f, 0.0f ) * mRotation;
+			vec4 aixX = mRotation * vec4( 1.0f, 0.0f, 0.0f, 0.0f );
+			vec4 aixX2 = vec4( 1.0f, 0.0f, 0.0f, 0.0f ) * mRotation;
+
+			if ( aixX2 != aixX )
+			{
+				std::cout << "yes" << std::endl;
+			}
+			vec4 aixY = mRotation * vec4( 0.0f, 1.0f, 0.0f, 0.0f );
+			vec4 aixZ = mRotation * vec4( 0.0f, 0.0f, 1.0f, 0.0f );
 
 			right.x = aixX.x;
 			right.y = aixX.y;
@@ -169,17 +181,22 @@ class RTCamera
 	}
 
   public:
-    void copyMCamera(mat4& m)
-    {
+	void copyMCamera( mat4 &m )
+	{
 		m = mRotation;
 
-        m[0][3] = position.x;
-		m[1][3] = position.y;
-		m[2][3] = position.z;
+		m[3][0] = position.x;
+		m[3][1] = position.y;
+		m[3][2] = position.z;
 		m[3][3] = 1;
-    }
+	}
 
-    bool moved() { bool temp = _moved_; _moved_ = false; return temp; }
+	bool moved()
+	{
+		bool temp = _moved_;
+		_moved_ = false;
+		return temp;
+	}
 
 	vec3 eye;
 	vec3 ahead;
@@ -195,8 +212,8 @@ class RTCamera
 	mat4 mRotation;
 	vec4 position;
 
-    void setMoved() { _moved_ = true; }
-    bool _moved_;
+	void setMoved() { _moved_ = true; }
+	bool _moved_;
 
 	// Depth Field
 	float d;

@@ -2,6 +2,8 @@
 #include "../Mesh/RTMesh.h"
 #include "../BVH/BVH.h"
 
+#include "../WFManager.h"
+
 
 class Scene
 {
