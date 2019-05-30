@@ -28,7 +28,7 @@ struct wf_queue_counter
 	uint raygenQueue;
 	uint extensionQueue;
 	uint shadowQueue;
-	uint bump;
+	uint materialQueue;
 };
 
 layout( std430, binding = 11 ) buffer QueueCounter_BUFFER

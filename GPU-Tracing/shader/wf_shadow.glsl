@@ -35,16 +35,16 @@ struct RTRay
 	vec3 hit_normal;
 	int shadowRayBlocked;
 
-    vec3 finalColor;
+	vec3 finalColor;
 	uint bounceNum;
 
-    vec4 albedo;
+	vec4 albedo;
 
 	vec2 hit_texCoord;
 	uint bContinue;
 	float pdf_hemi_brdf;
 
-    vec3 random_dir;
+	vec3 random_dir;
 	float brdf;
 
     vec3 light_color;
@@ -213,9 +213,6 @@ layout( std430, binding = 15 ) buffer ShadowQueue_BUFFER
 	uint shadowQueue[];
 };
 ///////////////////////////////////////////////
-
-uniform uint frame_id;
-uniform mat4 mvMatrix;
 
 uint random_seed;
 uint SCRWIDTH = 800u;
@@ -630,7 +627,7 @@ bool evaluate( RTMaterial material, RTRay ray, SurfaceData hitPnt,
 	return false;
 }
 
-float brdf( RTMaterial material, RTRay ray, SurfaceData hitPnt, RTRay ray_random )
+float material_brdf( RTMaterial material, RTRay ray, SurfaceData hitPnt, RTRay ray_random )
 {
 	float cosine = 0.0f;
 	vec3 reflect_dir;
@@ -670,243 +667,70 @@ float BalanceHeuristicWeight( float pdf1, float pdf2 )
 const int DIFFUSE = 1;
 const int maxRecursionDepth = 5;
 
-vec3 shade_diffuse( RTRay ray, RTIntersection intersection )
+
+void main()
 {
-	SurfaceData hitPnt;
-	getSurfaceData( ray, intersection, hitPnt );
+	uint globalIdx = gl_GlobalInvocationID.x;
 
-	vec3 color = vec3( 0.0f );
+	if ( globalIdx > qc.shadowQueue )
+		return;
 
-	RTMaterial material = materials[hitPnt.materialID];
+	uint gid = shadowQueue[globalIdx];
 
-	vec4 albedo = getAlbedoAtPoint( hitPnt );
-
-	color = albedo.xyz * color_scene.xyz;
-
-	for ( int i = 0; i < light_num; i++ )
-	{
-		vec3 pos_light, light_normal;
-		float area;
-		getRandomPnt( pos_light, light_normal, area );
-		//pos_light = ( lights[i].v1.xyz + lights[i].v3.xyz ) * 0.5f;
-		vec3 d = pos_light - hitPnt.position;
-		float l = length( d );
-		d = normalize( d );
-		RTRay shadowRay;
-		shadowRay.pos = hitPnt.position + shadowBias * d;
-		shadowRay.dir = d;
-
-		RTIntersection intersection_shadow;
-		if ( getIntersection( shadowRay, intersection_shadow ) )
-		{
-			SurfaceData hitPnt_light;
-			getSurfaceData( shadowRay, intersection_shadow, hitPnt_light );
-
-			RTMaterial material_light = materials[hitPnt_light.materialID];
-			if ( isLight( material_light ) )
-			{
-				float cosine = dot( d, lights[i].normal.xyz );
-				cosine = ( cosine > 0.0f ? cosine : 0.0f );
-				color += cosine * albedo.xyz * material_light.emission;
-			}
-		}
-	}
-	return color;
-}
-
-vec4 ray_sample( RTRay ray, RTIntersection intersection )
-{
-	vec3 finalColor = vec3( 1 );
-
-	if ( !getIntersection( ray, intersection ) )
-	{
-		return color_scene;
-	}
-
-	vec3 color_obj = shade_diffuse( ray, intersection );
-
-	return vec4( color_obj, 1.0f );
-}
-bool path_sample( uint gid, RTIntersection intersection, int depth )
-{
-	bool bTerminate = false;
-
-    if (rays[gid].bounceNum == rp.nMaxBounces * 4)
-    {
-		rays[gid].finalColor += rays[gid].color_obj;
-
-        uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-		rayGenQueue[rayGenIdx] = gid;
-
-		bTerminate = true;
-		return bTerminate;
-    }
-
-
-    int triangle_id = rays[gid].hit_triangle_id;
-
-	if ( triangle_id == -1 )
-	{
-		rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * color_scene.xyz;
-
-		rays[gid].finalColor += rays[gid].color_obj;
-
-		uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-		rayGenQueue[rayGenIdx] = gid;
-
-		bTerminate = true;
-		return bTerminate;
-	}
-
-    intersection.triangle_id = rays[gid].hit_triangle_id;
-	intersection.u = rays[gid].hit_u;
-	intersection.v = rays[gid].hit_v;
-	intersection.distance = rays[gid].hit_distance;
-
-	SurfaceData hitPnt;
+    SurfaceData hitPnt;
 	hitPnt.position = rays[gid].hit_position;
 	hitPnt.normal = rays[gid].hit_normal;
 	hitPnt.texCoord = rays[gid].hit_texCoord;
 	hitPnt.materialID = rays[gid].hit_materialID;
 
-	RTMaterial material = materials[hitPnt.materialID];
+    RTMaterial material = materials[hitPnt.materialID];
 
-	// light material, MIS
-	if ( isLight( material ) )
+    rays[gid].shadowRayBlocked = 1;
+    // NEE
+	if ( ( material.shadingType & DIFFUSE ) == 1 )
 	{
-		if ( rays[gid].bounceNum == 0 )
+
+		vec3 pos, light_normal;
+		float area;
+		getRandomPnt( pos, light_normal, area );
+		vec3 Pnt2light = pos - hitPnt.position;
+		float distance2light = length( Pnt2light );
+
+		Pnt2light = normalize( Pnt2light );
+
+		if ( dot( Pnt2light, hitPnt.normal ) > 0.0f && dot( Pnt2light, light_normal ) <= 0.0f )
 		{
-			rays[gid].color_obj = material.emission;
-		}
-		else
-		{
-			vec3 pos, light_normal;
-			float area;
-			getRandomPnt( pos, light_normal, area );
+			vec3 org = hitPnt.position + shadowBias * Pnt2light;
+			RTRay lightSample;
+			lightSample.pos = org;
+			lightSample.dir = Pnt2light;
 
-			float distance2 = intersection.distance * intersection.distance;
+			RTIntersection intersection_light;
+			if ( getIntersection( lightSample, intersection_light ) )
+			{
+				SurfaceData hitPnt_light;
+				getSurfaceData( lightSample, intersection_light, hitPnt_light );
+				RTMaterial material_light = materials[hitPnt_light.materialID];
 
-			float solidAngle = dot( rays[gid].dir, light_normal ) * -1.0f * area / distance2;
+				// light material, MIS
+				if ( isLight( material_light ) )
+				{
+					float solidAngle = dot( Pnt2light, light_normal ) * -1.0f * area / ( distance2light * distance2light );
+					float pdf_light_nee = 1.0f / solidAngle;
 
-			float pdf_hemi_nee = 1.0f / solidAngle;
+					float pdf_brdf = dot( Pnt2light, hitPnt.normal ) * INV_PI;
 
-			float w1 = BalanceHeuristicWeight( rays[gid].pre_pdf_hemi_brdf, pdf_hemi_nee );
-			float w2 = 1.0f - w1;
+					float w1 = BalanceHeuristicWeight( pdf_brdf, pdf_light_nee );
+					float w2 = 1.0f - w1;
 
-			float light_w = w1 * rays[gid].pre_pdf_hemi_brdf + w2 * pdf_hemi_nee;
+					float pdf_mis_nee = w1 * pdf_brdf + w2 * pdf_light_nee;
 
-			rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].pre_pdf_hemi_brdf / light_w * rays[gid].color_obj * material.emission;
-		}
+					rays[gid].light_color = rays[gid].brdf_weight * material_light.emission * ( 1.0 / pdf_mis_nee ) * rays[gid].albedo.xyz * material_brdf( material, rays[gid], hitPnt, lightSample ) * INV_PI;
 
-		rays[gid].finalColor += rays[gid].color_obj;
-
-		uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-		rayGenQueue[rayGenIdx] = gid;
-
-		bTerminate = true;
-		return bTerminate;
-	}
-
-	float pdf_light_nee = 0.0f;
-	float pdf_hemi_brdf = rays[gid].pdf_hemi_brdf;
-	vec3 random_dir = rays[gid].random_dir;
-	bool bContinue = bool( rays[gid].bContinue );
-
-
-    if ( !bContinue )
-	{
-		rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * rays[gid].albedo.xyz;
-
-		rays[gid].finalColor += rays[gid].color_obj;
-
-		uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-		rayGenQueue[rayGenIdx] = gid;
-
-		bTerminate = true;
-		return bTerminate;
-	}
-
-	// Russian roulette
-	float max = max( rays[gid].albedo.x, max( rays[gid].albedo.y, rays[gid].albedo.z ) );
-	if ( depth > maxRecursionDepth )
-	{
-		if ( xorshift32() < max )
-		{
-			// Make up for the loss
-			rays[gid].albedo *= ( 1.0 / max );
-		}
-		else
-		{
-			rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * color_scene.xyz;
-
-			rays[gid].finalColor += rays[gid].color_obj;
-
-			uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-			rayGenQueue[rayGenIdx] = gid;
-
-			bTerminate = true;
-			return bTerminate;
+                    rays[gid].shadowRayBlocked = 0;
+				}
+			}
 		}
 	}
 
-    if (rays[gid].shadowRayBlocked == 0)
-    {
-		rays[gid].finalColor += rays[gid].light_color;
-    }
-
-	rays[gid].brdf_weight = rays[gid].brdf_weight * rays[gid].albedo.xyz * rays[gid].brdf * ( 1.0f / pdf_hemi_brdf ) * INV_PI;
-
-	rays[gid].pos = hitPnt.position + shadowBias * random_dir;
-	rays[gid].dir = random_dir;
-
-	rays[gid].pre_pdf_hemi_brdf = pdf_hemi_brdf;
-
-	rays[gid].bounceNum++;
-
-    uint extensionIdx = atomicAdd( qc.extensionQueue, 1u );
-	extensionQueue[extensionIdx] = gid;
-}
-
-void add_vec4( uint idx, vec3 finalColor )
-{
-#ifdef FLT_FLOAT_ATOMICS
-	atomic_add_float( colors[pixelIdx].x, finalColor.x );
-	atomic_add_float( colors[pixelIdx].y, finalColor.y );
-	atomic_add_float( colors[pixelIdx].z, finalColor.z );
-	atomic_add_float( colors[pixelIdx].w, 1.0f );
-#else
-	colors[idx] += vec4( finalColor, 1.0f );
-#endif
-}
-
-void main()
-{
-	uint gid = gl_GlobalInvocationID.x;
-
-	if ( gid > rp.nTaskNum )
-		return;
-
-    uint curIdx = rays[gid].pixelIdx;
-
-	uint xId = curIdx % rp.nWidth;
-	uint yId = curIdx / rp.nWidth;
-
-	uint largePrime1 = 386030683u;
-	uint largePrime2 = 919888919u;
-	uint largePrime3 = 101414101u;
-
-	random_seed = ( ( xId * largePrime1 + yId ) * largePrime1 + frame_id * largePrime3 );
-
-	RTIntersection intersection;
-
-	bool bTerminate = path_sample( gid, intersection, 0 );
-
-    if (bTerminate)
-    {
-		add_vec4( curIdx, rays[gid].finalColor );
-
-		vec4 avgColor = vec4( colors[curIdx].xyz / colors[curIdx].w, 1.0f );
-
-		imageStore( destTex, ivec2( xId, yId ), avgColor );
-    }
 }

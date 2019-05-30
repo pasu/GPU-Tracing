@@ -34,9 +34,16 @@ struct RTRay
 	vec3 finalColor;
 	uint bounceNum;
 
-    vec4 albedo;
+	vec4 albedo;
 
 	vec2 hit_texCoord;
+	uint bContinue;
+	float pdf_hemi_brdf;
+
+	vec3 random_dir;
+	float brdf;
+
+    vec3 light_color;
 };
 
 layout( std430, binding = 1 ) buffer RTRAY_BUFFER
@@ -64,7 +71,7 @@ struct wf_queue_counter
 	uint raygenQueue;
 	uint extensionQueue;
 	uint shadowQueue;
-	uint bump;
+	uint materialQueue;
 };
 
 layout( std430, binding = 11 ) buffer QueueCounter_BUFFER

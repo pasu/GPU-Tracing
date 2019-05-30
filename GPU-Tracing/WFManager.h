@@ -52,13 +52,13 @@ struct wf_queue_counter
 	uint raygenQueue;
 	uint extensionQueue;
 	uint shadowQueue;
-	uint bump;
+	uint materialQueue;
 
     wf_queue_counter()
     {
 		raygenQueue = 0u;
 		extensionQueue = 0u;
 		shadowQueue = 0u;
-		bump = 0u;
+		materialQueue = 0u;
     }
 };

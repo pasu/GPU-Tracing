@@ -32,9 +32,16 @@ struct RTRay
 	vec3 finalColor;
 	uint bounceNum;
 
-    vec4 albedo;
+	vec4 albedo;
 
 	vec2 hit_texCoord;
+	uint bContinue;
+	float pdf_hemi_brdf;
+
+	vec3 random_dir;
+	float brdf;
+
+    vec3 light_color;
 };
 
 layout( std430, binding = 1 ) buffer RTRAY_BUFFER
@@ -98,13 +105,31 @@ layout( std430, binding = 3 ) buffer BVH_BUFFER
 	BVHNode_32 bvh_nodes[];
 };
 
+struct RTMaterial
+{
+	vec3 color;
+	float reflectionFactor;
+
+	vec3 emission;
+	float indexOfRefraction;
+
+	int shadingType;
+	int texID;
+	float m_pow;
+	float m_k;
+};
+
+layout( std430, binding = 4 ) buffer MATERIAL_BUFFER
+{
+	RTMaterial materials[];
+};
 
 struct wf_queue_counter
 {
 	uint raygenQueue;
 	uint extensionQueue;
 	uint shadowQueue;
-	uint bump;
+	uint materialQueue;
 };
 
 layout( std430, binding = 11 ) buffer QueueCounter_BUFFER
@@ -405,6 +430,16 @@ void getSurfaceData( RTRay ray, RTIntersection intersection, out SurfaceData hit
 	return;
 }
 
+bool isLight( RTMaterial material )
+{
+	if ( floatEquals( material.emission.x, 0.0f ) && floatEquals( material.emission.y, 0.0f ) && floatEquals( material.emission.z, 0.0f ) )
+	{
+		return false;
+	}
+
+	return true;
+}
+
 void main()
 {
 	uint globalIdx = gl_GlobalInvocationID.x;
@@ -437,6 +472,18 @@ void main()
 		rays[gid].hit_normal = hitPnt.normal;
 		rays[gid].hit_texCoord = hitPnt.texCoord;
 		rays[gid].hit_materialID = hitPnt.materialID;
+
+        RTMaterial material = materials[hitPnt.materialID];
+
+		// light material, MIS
+		if ( !isLight( material ) )
+		{
+			uint materialIdx = atomicAdd( qc.materialQueue, 1u );
+			materialQueue[materialIdx] = gid;
+
+            uint shadowIdx = atomicAdd( qc.shadowQueue, 1u );
+			shadowQueue[shadowIdx] = gid;
+		}
     }
 
     return;

@@ -143,6 +143,8 @@ int main()
 	GLuint wf_reset_SID = loadcomputeshader( "./shader/wf_reset.glsl" );
 	GLuint genRay_SID = loadcomputeshader( "./shader/wf_rayGen.glsl" );
 	GLuint wf_extension_SID = loadcomputeshader( "./shader/wf_extension.glsl" );
+	GLuint wf_material_SID = loadcomputeshader( "./shader/wf_material.glsl" );
+	GLuint wf_shadow_SID = loadcomputeshader( "./shader/wf_shadow.glsl" );
 	////////////////////////////////////////////////////////////////////
 	// hit with Ray
 	GLuint texHandle = genTexture();
@@ -232,6 +234,14 @@ int main()
 			glUseProgram( wf_extension_SID );
 			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
 
+            //4 material intersection
+			glUseProgram( wf_material_SID );
+			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
+
+            //5 material intersection
+			glUseProgram( wf_shadow_SID );
+			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
+
             scene.resetQueue( queueCounter_ID );
 			scene.getQueueCount( queueCounter_ID, qc );
         }
@@ -256,6 +266,14 @@ int main()
 
 			//3 extension intersection
 			glUseProgram( wf_extension_SID );
+			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
+
+            //4 material intersection
+			glUseProgram( wf_material_SID );
+			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
+
+            //5 material intersection
+			glUseProgram( wf_shadow_SID );
 			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
 
             scene.resetQueue( queueCounter_ID );

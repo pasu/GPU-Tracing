@@ -209,8 +209,10 @@
     <None Include="shader\tracingRay.glsl" />
     <None Include="shader\wf_extension.glsl" />
     <None Include="shader\wf_logic.glsl" />
+    <None Include="shader\wf_material.glsl" />
     <None Include="shader\wf_rayGen.glsl" />
     <None Include="shader\wf_reset.glsl" />
+    <None Include="shader\wf_shadow.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -39,6 +39,13 @@ struct RTRay
 	vec4 albedo;
 
 	vec2 hit_texCoord;
+	uint bContinue;
+	float pdf_hemi_brdf;
+
+	vec3 random_dir;
+	float brdf;
+
+    vec3 light_color;
 	
 };
 
