@@ -50,14 +50,14 @@ struct wf_PathState
 struct wf_queue_counter
 {
 	uint raygenQueue;
-	uint extentionQueue;
+	uint extensionQueue;
 	uint shadowQueue;
 	uint bump;
 
     wf_queue_counter()
     {
 		raygenQueue = 0u;
-		extentionQueue = 0u;
+		extensionQueue = 0u;
 		shadowQueue = 0u;
 		bump = 0u;
     }

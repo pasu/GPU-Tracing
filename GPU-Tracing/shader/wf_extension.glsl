@@ -3,15 +3,38 @@ layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
 
 //All SSBO should copy from ssbo.glsl
 ///////////////////////////////////////////////
-layout( std430, binding = 0 ) buffer SCREEN_BUFFER
-{
-	vec4 colors[];
-};
-
 struct RTRay
 {
-	vec4 pos;
-	vec4 dir;
+	vec3 pos;
+	float pre_pdf_hemi_brdf;
+
+	vec3 dir;
+	uint pixelIdx;
+
+	vec3 shadow_dir;
+	int hit_triangle_id;
+
+	vec3 color_obj;
+	float hit_u;
+
+	vec3 brdf_weight;
+	int hit_materialID;
+
+	vec3 final_color;
+	float hit_v;
+
+	vec3 hit_position;
+	float hit_distance;
+
+	vec3 hit_normal;
+	int shadowRayBlocked;
+
+	vec3 finalColor;
+	uint bounceNum;
+
+    vec4 albedo;
+
+	vec2 hit_texCoord;
 };
 
 layout( std430, binding = 1 ) buffer RTRAY_BUFFER
@@ -75,107 +98,11 @@ layout( std430, binding = 3 ) buffer BVH_BUFFER
 	BVHNode_32 bvh_nodes[];
 };
 
-struct RTMaterial
-{
-	vec3 color;
-	float reflectionFactor;
-
-	vec3 emission;
-	float indexOfRefraction;
-
-	int shadingType;
-	int texID;
-	float m_pow;
-	float m_k;
-};
-
-layout( std430, binding = 4 ) buffer MATERIAL_BUFFER
-{
-	RTMaterial materials[];
-};
-
-layout( std430, binding = 5 ) buffer TEXTURE_BUFFER
-{
-	float texture_buf[];
-};
-
-struct RTTexInfo
-{
-	int idx;
-	int offset;
-	int width;
-	int height;
-};
-
-layout( std430, binding = 6 ) buffer TexInfo_BUFFER
-{
-	RTTexInfo textureInfos[];
-};
-
-struct RTLightBoundary
-{
-	vec4 v1;
-	vec4 v2;
-	vec4 v3;
-	vec4 v4;
-	vec4 normal;
-};
-
-layout( std430, binding = 7 ) buffer LIGHT_BUFFER
-{
-	RTLightBoundary lights[];
-};
-
-layout( std430, binding = 8 ) buffer LIGHT_NUM_BUFFER
-{
-	int light_num;
-};
-
-struct RenderParameters
-{
-	uint nTaskNum;
-	uint nWidth;
-	uint nHeight;
-	uint nMaxBounces;
-};
-
-layout( std430, binding = 9 ) buffer RenderParameters_BUFFER
-{
-	RenderParameters rp;
-};
-
-struct wf_PathState
-{
-	vec3 indirect_pos;
-	float pre_pdf_hemi_brdf;
-
-	vec3 indirect_dir;
-	float light_weight;
-
-	vec4 final_color; // w: iteration number
-
-	vec3 shadow_pos;
-	uint pixelIdx;
-
-	vec3 shadow_dir;
-	int hit_triangle_id;
-
-	float hit_u;
-	float hit_v;
-	float hit_distance;
-
-	int shadowRayBlocked;
-};
-
-layout( std430, binding = 10 ) buffer PathState_BUFFER
-{
-	wf_PathState ps[];
-};
 
 struct wf_queue_counter
 {
 	uint raygenQueue;
-	uint extentionQueue;
+	uint extensionQueue;
 	uint shadowQueue;
 	uint bump;
 };
@@ -481,7 +408,7 @@ void getSurfaceData( RTRay ray, RTIntersection intersection, out SurfaceData hit
 void main()
 {
 	uint globalIdx = gl_GlobalInvocationID.x;
-	if ( globalIdx > qc.extentionQueue )
+	if ( globalIdx > qc.extensionQueue )
 		return;
 
     uint gid = extensionQueue[globalIdx];
@@ -489,27 +416,27 @@ void main()
     RTIntersection intersection;
 
     RTRay ray;
-	ray.pos = vec4( ps[gid].indirect_pos, 1.0 );
-	ray.dir = vec4( ps[gid].indirect_dir, 1.0 );
+	ray.pos = rays[gid].pos;
+	ray.dir = rays[gid].dir;
 
 	bool bHit = getIntersection( ray, intersection );
 
-    ps[gid].hit_triangle_id = -1;
+    rays[gid].hit_triangle_id = -1;
 
     if (bHit)
     {
 		SurfaceData hitPnt;
 		getSurfaceData( ray, intersection, hitPnt );
 
-		ps[gid].hit_triangle_id = intersection.triangle_id;
-		ps[gid].hit_u = intersection.u;
-		ps[gid].hit_v = intersection.v;
-		ps[gid].hit_distance = intersection.distance;
+		rays[gid].hit_triangle_id = intersection.triangle_id;
+		rays[gid].hit_u = intersection.u;
+		rays[gid].hit_v = intersection.v;
+		rays[gid].hit_distance = intersection.distance;
 
-        ps[gid].hit_position = hitPnt.position;
-		ps[gid].hit_normal = hitPnt.normal;
-		ps[gid].hit_texCoord = hitPnt.texCoord;
-		ps[gid].hit_materialID = hitPnt.materialID;
+        rays[gid].hit_position = hitPnt.position;
+		rays[gid].hit_normal = hitPnt.normal;
+		rays[gid].hit_texCoord = hitPnt.texCoord;
+		rays[gid].hit_materialID = hitPnt.materialID;
     }
 
     return;

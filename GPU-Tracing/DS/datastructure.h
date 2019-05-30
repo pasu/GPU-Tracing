@@ -34,6 +34,10 @@ struct RTRay
 	int shadowRayBlocked;
 
 	vec3 finalColor;
+	uint bounceNum;
+
+	vec4 albedo;
+
 	vec2 hit_texCoord;
 	
 };

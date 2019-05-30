@@ -26,7 +26,7 @@ layout( std430, binding = 9 ) buffer RenderParameters_BUFFER
 struct wf_queue_counter
 {
 	uint raygenQueue;
-	uint extentionQueue;
+	uint extensionQueue;
 	uint shadowQueue;
 	uint bump;
 };

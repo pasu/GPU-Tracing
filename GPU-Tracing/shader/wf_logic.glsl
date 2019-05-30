@@ -38,6 +38,7 @@ struct RTRay
     vec3 finalColor;
 	uint bounceNum;
 
+    vec4 albedo;
 	vec2 hit_texCoord;
 };
 
@@ -174,7 +175,7 @@ layout( std430, binding = 9 ) buffer RenderParameters_BUFFER
 struct wf_queue_counter
 {
 	uint raygenQueue;
-	uint extentionQueue;
+	uint extensionQueue;
 	uint shadowQueue;
 	uint bump;
 };
@@ -725,7 +726,7 @@ bool path_sample( uint gid, RTIntersection intersection, int depth )
     if (rays[gid].bounceNum == rp.nMaxBounces * 4)
     {
 		rays[gid].finalColor += rays[gid].color_obj;
-		rays[gid].finalColor = vec3( 1, 0, 0 );
+
         uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
 		rayGenQueue[rayGenIdx] = gid;
 
@@ -734,162 +735,173 @@ bool path_sample( uint gid, RTIntersection intersection, int depth )
     }
 
 
+    int triangle_id = rays[gid].hit_triangle_id;
+
+	if ( triangle_id == -1 )
 	{
-		if ( !getIntersection( rays[gid], intersection ) )
+		rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * color_scene.xyz;
+
+		rays[gid].finalColor += rays[gid].color_obj;
+
+		uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
+		rayGenQueue[rayGenIdx] = gid;
+
+		bTerminate = true;
+		return bTerminate;
+	}
+
+    intersection.triangle_id = rays[gid].hit_triangle_id;
+	intersection.u = rays[gid].hit_u;
+	intersection.v = rays[gid].hit_v;
+	intersection.distance = rays[gid].hit_distance;
+
+	SurfaceData hitPnt;
+	hitPnt.position = rays[gid].hit_position;
+	hitPnt.normal = rays[gid].hit_normal;
+	hitPnt.texCoord = rays[gid].hit_texCoord;
+	hitPnt.materialID = rays[gid].hit_materialID;
+
+	RTMaterial material = materials[hitPnt.materialID];
+
+	// light material, MIS
+	if ( isLight( material ) )
+	{
+		if ( rays[gid].bounceNum == 0 )
 		{
-			rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * color_scene.xyz;
-			
-            rays[gid].finalColor += rays[gid].color_obj;
-
-			uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-			rayGenQueue[rayGenIdx] = gid;
-
-			bTerminate = true;
-			return bTerminate;
+			rays[gid].color_obj = material.emission;
 		}
-
-		SurfaceData hitPnt;
-		getSurfaceData( rays[gid], intersection, hitPnt );
-		RTMaterial material = materials[hitPnt.materialID];
-
-		// light material, MIS
-		if ( isLight( material ) )
+		else
 		{
-			if ( rays[gid].bounceNum == 0 )
-			{
-				rays[gid].color_obj = material.emission;
-			}
-			else
-			{
-				vec3 pos, light_normal;
-				float area;
-				getRandomPnt( pos, light_normal, area );
-
-				float distance2 = intersection.distance * intersection.distance;
-
-				float solidAngle = dot( rays[gid].dir, light_normal ) * -1.0f * area / distance2;
-
-				float pdf_hemi_nee = 1.0f / solidAngle;
-
-				float w1 = BalanceHeuristicWeight( rays[gid].pre_pdf_hemi_brdf, pdf_hemi_nee );
-				float w2 = 1.0f - w1;
-
-				float light_w = w1 * rays[gid].pre_pdf_hemi_brdf + w2 * pdf_hemi_nee;
-
-				rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].pre_pdf_hemi_brdf / light_w * rays[gid].color_obj * material.emission;
-			}
-
-            rays[gid].finalColor += rays[gid].color_obj;
-
-			uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-			rayGenQueue[rayGenIdx] = gid;
-
-			bTerminate = true;
-			return bTerminate;
-		}
-
-		float pdf_hemi_brdf, pdf_light_nee = 0.0f;
-		float weight_indirect = 1.0f, weight_direct = 0.0f;
-
-        vec4 albedo;
-		vec3 random_dir;
-		bool bContinue = evaluate( material, rays[gid], hitPnt, random_dir, pdf_hemi_brdf, albedo );
-		if ( !bContinue )
-		{
-			rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * albedo.xyz;
-
-            rays[gid].finalColor += rays[gid].color_obj;
-
-			uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-			rayGenQueue[rayGenIdx] = gid;
-
-			bTerminate = true;
-			return bTerminate;
-		}
-
-		// Russian roulette
-		float max = max( albedo.x, max( albedo.y, albedo.z ) );
-		if ( depth > maxRecursionDepth )
-		{
-			if ( xorshift32() < max )
-			{
-				// Make up for the loss
-				albedo *= ( 1.0 / max );
-			}
-			else
-			{
-				rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * color_scene.xyz;
-				
-                rays[gid].finalColor += rays[gid].color_obj;
-
-				uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
-				rayGenQueue[rayGenIdx] = gid;
-
-				bTerminate = true;
-				return bTerminate;
-			}
-		}
-
-		RTRay ray_random;
-		ray_random.pos = hitPnt.position + shadowBias * random_dir;
-		ray_random.dir = random_dir;
-
-		// NEE
-		if ( ( material.shadingType & DIFFUSE ) == 1 )
-		{
-
 			vec3 pos, light_normal;
 			float area;
 			getRandomPnt( pos, light_normal, area );
-			vec3 Pnt2light = pos - hitPnt.position;
-			float distance2light = length( Pnt2light );
 
-			Pnt2light = normalize( Pnt2light );
+			float distance2 = intersection.distance * intersection.distance;
 
-			if ( dot( Pnt2light, hitPnt.normal ) > 0.0f && dot( Pnt2light, light_normal ) <= 0.0f )
+			float solidAngle = dot( rays[gid].dir, light_normal ) * -1.0f * area / distance2;
+
+			float pdf_hemi_nee = 1.0f / solidAngle;
+
+			float w1 = BalanceHeuristicWeight( rays[gid].pre_pdf_hemi_brdf, pdf_hemi_nee );
+			float w2 = 1.0f - w1;
+
+			float light_w = w1 * rays[gid].pre_pdf_hemi_brdf + w2 * pdf_hemi_nee;
+
+			rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].pre_pdf_hemi_brdf / light_w * rays[gid].color_obj * material.emission;
+		}
+
+		rays[gid].finalColor += rays[gid].color_obj;
+
+		uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
+		rayGenQueue[rayGenIdx] = gid;
+
+		bTerminate = true;
+		return bTerminate;
+	}
+
+	float pdf_hemi_brdf, pdf_light_nee = 0.0f;
+	float weight_indirect = 1.0f, weight_direct = 0.0f;
+
+	vec3 random_dir;
+	bool bContinue = evaluate( material, rays[gid], hitPnt, random_dir, pdf_hemi_brdf, rays[gid].albedo );
+	if ( !bContinue )
+	{
+		rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * rays[gid].albedo.xyz;
+
+		rays[gid].finalColor += rays[gid].color_obj;
+
+		uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
+		rayGenQueue[rayGenIdx] = gid;
+
+		bTerminate = true;
+		return bTerminate;
+	}
+
+	// Russian roulette
+	float max = max( rays[gid].albedo.x, max( rays[gid].albedo.y, rays[gid].albedo.z ) );
+	if ( depth > maxRecursionDepth )
+	{
+		if ( xorshift32() < max )
+		{
+			// Make up for the loss
+			rays[gid].albedo *= ( 1.0 / max );
+		}
+		else
+		{
+			rays[gid].color_obj = rays[gid].brdf_weight * rays[gid].color_obj * color_scene.xyz;
+
+			rays[gid].finalColor += rays[gid].color_obj;
+
+			uint rayGenIdx = atomicAdd( qc.raygenQueue, 1u );
+			rayGenQueue[rayGenIdx] = gid;
+
+			bTerminate = true;
+			return bTerminate;
+		}
+	}
+
+	RTRay ray_random;
+	ray_random.pos = hitPnt.position + shadowBias * random_dir;
+	ray_random.dir = random_dir;
+
+	// NEE
+	if ( ( material.shadingType & DIFFUSE ) == 1 )
+	{
+
+		vec3 pos, light_normal;
+		float area;
+		getRandomPnt( pos, light_normal, area );
+		vec3 Pnt2light = pos - hitPnt.position;
+		float distance2light = length( Pnt2light );
+
+		Pnt2light = normalize( Pnt2light );
+
+		if ( dot( Pnt2light, hitPnt.normal ) > 0.0f && dot( Pnt2light, light_normal ) <= 0.0f )
+		{
+			vec3 org = hitPnt.position + shadowBias * Pnt2light;
+			RTRay lightSample;
+			lightSample.pos = org;
+			lightSample.dir = Pnt2light;
+
+			RTIntersection intersection_light;
+			if ( getIntersection( lightSample, intersection_light ) )
 			{
-				vec3 org = hitPnt.position + shadowBias * Pnt2light;
-				RTRay lightSample;
-				lightSample.pos = org;
-				lightSample.dir = Pnt2light;
+				SurfaceData hitPnt_light;
+				getSurfaceData( lightSample, intersection_light, hitPnt_light );
+				RTMaterial material_light = materials[hitPnt_light.materialID];
 
-				RTIntersection intersection_light;
-				if ( getIntersection( lightSample, intersection_light ) )
+				// light material, MIS
+				if ( isLight( material_light ) )
 				{
-					SurfaceData hitPnt_light;
-					getSurfaceData( lightSample, intersection_light, hitPnt_light );
-					RTMaterial material_light = materials[hitPnt_light.materialID];
+					float solidAngle = dot( Pnt2light, light_normal ) * -1.0f * area / ( distance2light * distance2light );
+					pdf_light_nee = 1.0f / solidAngle;
 
-					// light material, MIS
-					if ( isLight( material_light ) )
-					{
-						float solidAngle = dot( Pnt2light, light_normal ) * -1.0f * area / ( distance2light * distance2light );
-						pdf_light_nee = 1.0f / solidAngle;
+					float pdf_brdf = dot( Pnt2light, hitPnt.normal ) * INV_PI;
 
-						float pdf_brdf = dot( Pnt2light, hitPnt.normal ) * INV_PI;
+					float w1 = BalanceHeuristicWeight( pdf_brdf, pdf_light_nee );
+					float w2 = 1.0f - w1;
 
-						float w1 = BalanceHeuristicWeight( pdf_brdf, pdf_light_nee );
-						float w2 = 1.0f - w1;
+					float pdf_mis_nee = w1 * pdf_brdf + w2 * pdf_light_nee;
 
-						float pdf_mis_nee = w1 * pdf_brdf + w2 * pdf_light_nee;
+					vec3 color = rays[gid].brdf_weight * material_light.emission * ( 1.0 / pdf_mis_nee ) * rays[gid].albedo.xyz * brdf( material, rays[gid], hitPnt, lightSample ) * INV_PI;
 
-						vec3 color = rays[gid].brdf_weight * material_light.emission * ( 1.0 / pdf_mis_nee ) * albedo.xyz * brdf( material, rays[gid], hitPnt, lightSample ) * INV_PI;
-
-						rays[gid].finalColor += color;
-					}
+					rays[gid].finalColor += color;
 				}
 			}
 		}
-
-		rays[gid].brdf_weight = rays[gid].brdf_weight * albedo.xyz * brdf( material, rays[gid], hitPnt, ray_random ) * ( 1.0f / pdf_hemi_brdf ) * INV_PI;
-
-		rays[gid].pos = ray_random.pos;
-		rays[gid].dir = ray_random.dir;
-
-		rays[gid].pre_pdf_hemi_brdf = pdf_hemi_brdf;
-
-        rays[gid].bounceNum++;
 	}
+
+	rays[gid].brdf_weight = rays[gid].brdf_weight * rays[gid].albedo.xyz * brdf( material, rays[gid], hitPnt, ray_random ) * ( 1.0f / pdf_hemi_brdf ) * INV_PI;
+
+	rays[gid].pos = ray_random.pos;
+	rays[gid].dir = ray_random.dir;
+
+	rays[gid].pre_pdf_hemi_brdf = pdf_hemi_brdf;
+
+	rays[gid].bounceNum++;
+
+    uint extensionIdx = atomicAdd( qc.extensionQueue, 1u );
+	extensionQueue[extensionIdx] = gid;
 }
 
 void add_vec4( uint idx, vec3 finalColor )
@@ -931,11 +943,6 @@ void main()
 		add_vec4( curIdx, rays[gid].finalColor );
 
 		vec4 avgColor = vec4( colors[curIdx].xyz / colors[curIdx].w, 1.0f );
-
-		if ( qc.extentionQueue == uint( 1 << 20 ) )
-		{
-			avgColor = vec4( 1, 0, 0, 1 );
-		}
 
 		imageStore( destTex, ivec2( xId, yId ), avgColor );
     }

@@ -34,6 +34,8 @@ struct RTRay
 	vec3 finalColor;
 	uint bounceNum;
 
+    vec4 albedo;
+
 	vec2 hit_texCoord;
 };
 
@@ -60,7 +62,7 @@ layout( std430, binding = 9 ) buffer RenderParameters_BUFFER
 struct wf_queue_counter
 {
 	uint raygenQueue;
-	uint extentionQueue;
+	uint extensionQueue;
 	uint shadowQueue;
 	uint bump;
 };
@@ -136,7 +138,8 @@ void main()
 	rays[gid].brdf_weight = vec3( 1.0f );
 	rays[gid].pre_pdf_hemi_brdf = 1.0f;
 	rays[gid].bounceNum = 0;
+	rays[gid].albedo = vec4( 0 );
 
-    uint extIdx = atomicAdd( qc.extentionQueue, 1u );
+    uint extIdx = atomicAdd( qc.extensionQueue, 1u );
 	extensionQueue[extIdx] = gid;
 }
