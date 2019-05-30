@@ -65,7 +65,8 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 						GLuint &texturesBuffer_ID,
 						GLuint &textureInfosBuffer_ID,
 						GLuint &lightsBuffer_ID,
-                        GLuint &lightsNumBuffer_ID )
+                        GLuint &lightsNumBuffer_ID,
+						GLuint &queueCounter_ID )
 {
 	BuildBVHTree();
 
@@ -73,9 +74,10 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, screenBuffer_ID );
 	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( vec4 ) * SCRWIDTH * SCRHEIGHT, NULL, GL_STATIC_READ );
 
+    RenderParameters rp;
 	glGenBuffers( 1, &rayBuffer_ID );
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, rayBuffer_ID );
-	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( RTRay ) * SCRWIDTH * SCRHEIGHT, NULL, GL_STATIC_READ );
+	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( RTRay ) * rp.nTaskNum, NULL, GL_STATIC_READ );
 
     glGenBuffers( 1, &triangleBuffer_ID );
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, triangleBuffer_ID );
@@ -117,7 +119,6 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( int ), &light_num, GL_STATIC_DRAW );
 
     //WF Manager
-	RenderParameters rp;
 	GLuint renderParameters_ID;
 	glGenBuffers( 1, &renderParameters_ID );
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, renderParameters_ID );
@@ -128,10 +129,9 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, pathState_ID );
 	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( wf_PathState ) * rp.nTaskNum, NULL, GL_STATIC_DRAW );
 
-    GLuint queueCounter_ID;
 	glGenBuffers( 1, &queueCounter_ID );
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, queueCounter_ID );
-	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( wf_queue_counter ), NULL, GL_STATIC_DRAW );
+	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( wf_queue_counter ), NULL, GL_STATIC_READ );
 
     GLuint genQueue_ID;
 	glGenBuffers( 1, &genQueue_ID );
@@ -170,6 +170,20 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 13, materialsQueue_ID );
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 14, extensionQueue_ID );
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 15, shadowQueue_ID );
+}
+
+void Scene::resetQueue( GLuint &queueCounter_ID )
+{
+	wf_queue_counter qs;
+
+	glBindBuffer( GL_SHADER_STORAGE_BUFFER, queueCounter_ID );
+	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( wf_queue_counter ), &qs, GL_DYNAMIC_DRAW );
+}
+
+void Scene::getQueueCount( GLuint &queueCounter_ID, wf_queue_counter &qc )
+{
+	glBindBuffer( GL_SHADER_STORAGE_BUFFER, queueCounter_ID );
+	glGetBufferSubData( GL_SHADER_STORAGE_BUFFER, 0, sizeof( wf_queue_counter ), &qc );
 }
 
 void Scene::savebuffer( const char *path )

@@ -69,7 +69,6 @@ int main()
 
 	double lastTime = glfwGetTime();
 
-glm:
 	mat4 modelViewMatrix = glm::mat4( 1.0 );
 	mat4 lastMatrix = glm::mat4( 1.0 );
 	////////////////////////////////////////////////////////////////////
@@ -122,22 +121,31 @@ glm:
     scene.addTriangle( v1, v2, v3 );
 	scene.addTriangle( v1, v3, v4 );
     */
-	// SSAO
+	// SSBO
+	RenderParameters rp;
+	uint task_num = rp.nTaskNum;
+
 	GLuint screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID,
 		materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID,
-		lightsBuffer_ID, lightsNumBuffer_ID;
+		lightsBuffer_ID, lightsNumBuffer_ID,
+		queueCounter_ID;
 
 	scene.buffer2GPU( screenBuffer_ID, rayBuffer_ID, triangleBuffer_ID, bvhBuffer_ID,
 					  materialsBuffer_ID, texturesBuffer_ID, textureInfosBuffer_ID,
-					  lightsBuffer_ID, lightsNumBuffer_ID );
+					  lightsBuffer_ID, lightsNumBuffer_ID, queueCounter_ID );
 
-	scene.savebuffer( "D://code//GPU-Tracing//scene" );
+	//scene.savebuffer( "D://code//GPU-Tracing//scene" );
 
-	GLuint genRay_SID = loadcomputeshader( "./shader/genRay.glsl" );
+    //wf_test
+    /////////////////////////////////////////////////////
+	//GLuint wf_genRay_SID = loadcomputeshader( "./shader/wf_extension.glsl" );
+    ////////////////////////////////////////////////////////
+	GLuint wf_reset_SID = loadcomputeshader( "./shader/wf_reset.glsl" );
+	GLuint genRay_SID = loadcomputeshader( "./shader/wf_rayGen.glsl" );
 	////////////////////////////////////////////////////////////////////
 	// hit with Ray
 	GLuint texHandle = genTexture();
-	GLuint tracing_SID = loadcomputeshader( "./shader/tracingRay.glsl" );
+	GLuint tracing_SID = loadcomputeshader( "./shader/wf_logic.glsl" );
 	///////////////////////////////////////////////////////////////////////
 
 	GLuint quad_ID = loadshaders( "./shader/quad.vertexshader", "./shader/quad.fragmentshader" );
@@ -181,6 +189,8 @@ glm:
 	{
 		auto start = clock();
 		static unsigned int frame_id = 0;
+		static uint total_num = 0;
+		static wf_queue_counter qc;
 
 		updateCamera( *camera );
 		camera->copyMCamera( modelViewMatrix );
@@ -194,20 +204,54 @@ glm:
 
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-		glUseProgram( genRay_SID );
+		if ( frame_id == 0)
+        {
+			total_num = 0;
+			//1 reset
+			glUseProgram( wf_reset_SID );
+			glUniform1ui( glGetUniformLocation( wf_reset_SID, "frame_id" ), frame_id );
+			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
 
-		glUniform1ui( glGetUniformLocation( genRay_SID, "frame_id" ), frame_id );
-		glUniformMatrix4fv( glGetUniformLocation( genRay_SID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
+            
+			scene.getQueueCount( queueCounter_ID, qc );
+            //2 gen ray
+			glUseProgram( genRay_SID );
 
-		glDispatchCompute( SCRWIDTH / LocalSize_X, SCRHEIGHT / LocalSize_Y, 1 ); // 512^2 threads in blocks of 16^2
+			glUniform1ui( glGetUniformLocation( genRay_SID, "total_num" ), total_num );
+			glUniform1ui( glGetUniformLocation( genRay_SID, "frame_id" ), frame_id++ );
+			glUniformMatrix4fv( glGetUniformLocation( genRay_SID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
 
-		glUseProgram( tracing_SID );
+			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
 
-		glUniform1ui( glGetUniformLocation( tracing_SID, "frame_id" ), frame_id++ );
-		glUniformMatrix4fv( glGetUniformLocation( tracing_SID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
+			scene.getQueueCount( queueCounter_ID, qc );
+			total_num += qc.raygenQueue;
+			total_num = total_num % ( SCRWIDTH * SCRHEIGHT );
 
-		glDispatchCompute( SCRWIDTH / LocalSize_X, SCRHEIGHT / LocalSize_Y, 1 ); // 512^2 threads in blocks of 16^2
+            scene.resetQueue( queueCounter_ID );
+			scene.getQueueCount( queueCounter_ID, qc );
+        }
+        else
+        {
+			glUseProgram( tracing_SID );
 
+			glUniform1ui( glGetUniformLocation( tracing_SID, "frame_id" ), frame_id );
+			glUniformMatrix4fv( glGetUniformLocation( tracing_SID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
+			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
+
+            //2 gen ray
+			glUseProgram( genRay_SID );
+			glUniform1ui( glGetUniformLocation( genRay_SID, "total_num" ), total_num );
+			glUniform1ui( glGetUniformLocation( genRay_SID, "frame_id" ), frame_id++ );
+			glUniformMatrix4fv( glGetUniformLocation( genRay_SID, "mvMatrix" ), 1, GL_FALSE, &modelViewMatrix[0][0] );
+			glDispatchCompute( task_num / LocalSize_X, 1, 1 ); // 800*800 threads in blocks of 256*1
+
+			scene.getQueueCount( queueCounter_ID, qc );
+			total_num += qc.raygenQueue;
+			total_num = total_num % ( SCRWIDTH * SCRHEIGHT );
+
+            scene.resetQueue( queueCounter_ID );
+        }
+		
 		glUseProgram( quad_ID );
 
 		glBindVertexArray( vao );

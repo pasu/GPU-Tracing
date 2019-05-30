@@ -202,11 +202,15 @@
   <ItemGroup>
     <None Include="shader\compute.glsl" />
     <None Include="shader\genRay.glsl" />
+    <None Include="shader\intersection.glsl" />
     <None Include="shader\quad.fragmentshader" />
     <None Include="shader\quad.vertexshader" />
     <None Include="shader\ssbo.glsl" />
     <None Include="shader\tracingRay.glsl" />
+    <None Include="shader\wf_extension.glsl" />
+    <None Include="shader\wf_logic.glsl" />
     <None Include="shader\wf_rayGen.glsl" />
+    <None Include="shader\wf_reset.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

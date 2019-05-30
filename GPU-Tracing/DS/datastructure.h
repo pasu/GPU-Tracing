@@ -9,8 +9,33 @@ using namespace glm;
 
 struct RTRay
 {
-	vec4 pos;
-	vec4 dir;
+	vec3 pos;
+	float pre_pdf_hemi_brdf;
+
+	vec3 dir;
+	uint pixelIdx;
+
+	vec3 shadow_dir;
+	int hit_triangle_id;
+
+	vec3 color_obj;
+	float hit_u;
+
+	vec3 brdf_weight;
+	int hit_materialID;
+
+	vec3 final_color;
+	float hit_v;
+
+	vec3 hit_position;
+	float hit_distance;
+
+	vec3 hit_normal;
+	int shadowRayBlocked;
+
+	vec3 finalColor;
+	vec2 hit_texCoord;
+	
 };
 
 struct AABB

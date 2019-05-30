@@ -28,7 +28,11 @@ class Scene
 					 GLuint &texturesBuffer_ID,
 					 GLuint &textureInfosBuffer_ID,
 					 GLuint &lightsBuffer_ID,
-					 GLuint &lightsNumBuffer_ID );
+					 GLuint &lightsNumBuffer_ID, 
+                     GLuint &queueCounter_ID );
+
+    void resetQueue( GLuint &queueCounter_ID );
+	void getQueueCount( GLuint &queueCounter_ID, wf_queue_counter& qc );
 
     void savebuffer(const char* path);
 
