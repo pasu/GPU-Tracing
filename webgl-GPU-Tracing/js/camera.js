@@ -68,7 +68,7 @@ Camera.prototype.turnLeft = function(rad){
     if (Math.abs(rad) > EPSILON) {
         this._moved_ = true;
     }
-    this.heading += rad;
+    this.heading -= rad;
     this.updateRotationMatrix();
 }
 
@@ -87,7 +87,7 @@ Camera.prototype.moveForward = function(d){
         this._moved_ = true;
     }
 
-    var localD = glMatrix.vec4.fromValues(0,0,d,1);
+    var localD = glMatrix.vec4.fromValues(0,0,-d,1);
 
     var identityM = glMatrix.mat4.create();
     glMatrix.mat4.rotateY( identityM, identityM, this.heading );
@@ -96,7 +96,7 @@ Camera.prototype.moveForward = function(d){
     glMatrix.vec4.transformMat4(localD,localD,identityM);
 
     this.position[0] += localD[0];
-    this.position[2] -= localD[2];
+    this.position[2] += localD[2];
 
     this.bUpdate = true;
 }
