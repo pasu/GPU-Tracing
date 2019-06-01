@@ -11,8 +11,43 @@ layout( std430, binding = 0 ) buffer SCREEN_BUFFER
 
 struct RTRay
 {
-	vec4 pos;
-	vec4 dir;
+	vec3 pos;
+	float pre_pdf_hemi_brdf;
+
+	vec3 dir;
+	uint pixelIdx;
+
+	vec3 shadow_dir;
+	int hit_triangle_id;
+
+	vec3 color_obj;
+	float hit_u;
+
+	vec3 brdf_weight;
+	int hit_materialID;
+
+	vec3 final_color;
+	float hit_v;
+
+	vec3 hit_position;
+	float hit_distance;
+
+	vec3 hit_normal;
+	int shadowRayBlocked;
+
+	vec3 finalColor;
+	uint bounceNum;
+
+	vec4 albedo;
+
+	vec2 hit_texCoord;
+	uint bContinue;
+	float pdf_hemi_brdf;
+
+	vec3 random_dir;
+	float brdf;
+
+	vec3 light_color;
 };
 
 layout( std430, binding = 1 ) buffer RTRAY_BUFFER
@@ -145,56 +180,35 @@ layout( std430, binding = 9 ) buffer RenderParameters_BUFFER
 	RenderParameters rp;
 };
 
-struct wf_PathState
-{
-	vec3 indirect_pos;
-	float pre_pdf_hemi_brdf;
-
-	vec3 indirect_dir;
-	float light_weight;
-
-	vec4 final_color; // w: iteration number
-
-	vec3 shadow_pos;
-	uint pixelIdx;
-
-	vec3 shadow_dir;
-};
-
-layout( std430, binding = 10 ) buffer PathState_BUFFER
-{
-	wf_PathState ps[];
-};
-
 struct wf_queue_counter
 {
 	uint raygenQueue;
-	uint extentionQueue;
+	uint extensionQueue;
 	uint shadowQueue;
-	uint bump;
+	uint materialQueue;
 };
 
-layout( std430, binding = 11 ) buffer QueueCounter_BUFFER
+layout( std430, binding = 10 ) buffer QueueCounter_BUFFER
 {
 	wf_queue_counter qc;
 };
 
-layout( std430, binding = 12 ) buffer genQueue_BUFFER
+layout( std430, binding = 11 ) buffer genQueue_BUFFER
 {
-	uint genQueue[];
+	uint rayGenQueue[];
 };
 
-layout( std430, binding = 13 ) buffer materialQueue_BUFFER
+layout( std430, binding = 12 ) buffer materialQueue_BUFFER
 {
 	uint materialQueue[];
 };
 
-layout( std430, binding = 14 ) buffer ExtensionQueue_BUFFER
+layout( std430, binding = 13 ) buffer ExtensionQueue_BUFFER
 {
 	uint extensionQueue[];
 };
 
-layout( std430, binding = 15 ) buffer ShadowQueue_BUFFER
+layout( std430, binding = 14 ) buffer ShadowQueue_BUFFER
 {
 	uint shadowQueue[];
 };
@@ -679,8 +693,8 @@ vec3 shade_diffuse( RTRay ray, RTIntersection intersection )
 		float l = length( d );
 		d = normalize( d );
 		RTRay shadowRay;
-		shadowRay.pos = vec4( hitPnt.position + shadowBias * d, 1.0f );
-		shadowRay.dir = vec4( d, 1.0f );
+		shadowRay.pos = hitPnt.position + shadowBias * d;
+		shadowRay.dir = d;
 
 		RTIntersection intersection_shadow;
 		if ( getIntersection( shadowRay, intersection_shadow ) )
@@ -794,8 +808,8 @@ vec4 path_sample( RTRay ray, RTIntersection intersection, int depth )
 		}
 
 		RTRay ray_random;
-		ray_random.pos = vec4( hitPnt.position + shadowBias * random_dir, 1.0f );
-		ray_random.dir = vec4( random_dir, 1.0f );
+		ray_random.pos = hitPnt.position + shadowBias * random_dir;
+		ray_random.dir = random_dir;
 
 		// NEE
 		if ( ( material.shadingType & DIFFUSE ) == 1 )
@@ -813,8 +827,8 @@ vec4 path_sample( RTRay ray, RTIntersection intersection, int depth )
 			{
 				vec3 org = hitPnt.position + shadowBias * Pnt2light;
 				RTRay lightSample;
-				lightSample.pos = vec4( org, 1.0f );
-				lightSample.dir = vec4( Pnt2light, 1.0f );
+				lightSample.pos = org;
+				lightSample.dir = Pnt2light;
 
 				RTIntersection intersection_light;
 				if ( getIntersection( lightSample, intersection_light ) )

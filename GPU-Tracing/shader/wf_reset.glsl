@@ -221,12 +221,12 @@ void main()
 	if ( gid > rp.nTaskNum )
 		return;
 	
-    if ( gid < rp.nWidth * rp.nHeight && frame_id == 0 )
+    if ( gid < rp.nWidth * rp.nHeight && frame_id == 0u )
     {
 		colors[gid] = vec4( 0.0f );
     }
     
-    if (gid == 0)
+    if (gid == 0u)
     {
 		qc.raygenQueue = rp.nTaskNum;
     }

@@ -731,7 +731,7 @@ bool path_sample( uint gid, RTIntersection intersection, int depth )
 {
 	bool bTerminate = false;
 
-    if (rays[gid].bounceNum == rp.nMaxBounces * 4)
+    if (rays[gid].bounceNum == rp.nMaxBounces * 4u)
     {
 		rays[gid].finalColor += rays[gid].color_obj;
 
@@ -774,7 +774,7 @@ bool path_sample( uint gid, RTIntersection intersection, int depth )
 	// light material, MIS
 	if ( isLight( material ) )
 	{
-		if ( rays[gid].bounceNum == 0 )
+		if ( rays[gid].bounceNum == 0u )
 		{
 			rays[gid].color_obj = material.emission;
 		}

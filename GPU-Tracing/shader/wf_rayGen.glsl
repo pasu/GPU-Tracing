@@ -241,7 +241,7 @@ vec4 randomDirection()
 void primaryRay( in uint x, in uint y, out RTRay ray )
 {
 	ray.pos = vec4( mvMatrix * vec4( 0, 0, 0, 1 ) ).xyz;
-	ray.dir = normalize( vec4( mvMatrix * vec4( vec3( float( x ) + xorshift32(), float( rp.nWidth - y ) + xorshift32(), 0 ) - vec3( rp.nWidth*0.5f ), 1 ) ) - vec4( ray.pos, 1.0f ) ).xyz;
+	ray.dir = normalize( vec4( mvMatrix * vec4( vec3( float( x ) + xorshift32(), float( uint(rp.nWidth) - y ) + xorshift32(), 0.0f ) - vec3( float(rp.nWidth)*0.5f ), 1.0f ) ) - vec4( ray.pos, 1.0f ) ).xyz;
 }
 
 void main()
@@ -271,8 +271,8 @@ void main()
 	rays[gid].color_obj = vec3( 1 );
 	rays[gid].brdf_weight = vec3( 1.0f );
 	rays[gid].pre_pdf_hemi_brdf = 1.0f;
-	rays[gid].bounceNum = 0;
-	rays[gid].albedo = vec4( 0 );
+	rays[gid].bounceNum = 0u;
+	rays[gid].albedo = vec4( 0.0f );
 
     uint extIdx = atomicAdd( qc.extensionQueue, 1u );
 	extensionQueue[extIdx] = gid;
