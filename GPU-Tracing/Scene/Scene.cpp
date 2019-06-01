@@ -124,11 +124,6 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, renderParameters_ID );
 	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( RenderParameters ), &rp, GL_STATIC_DRAW );
 
-    GLuint pathState_ID;
-	glGenBuffers( 1, &pathState_ID );
-	glBindBuffer( GL_SHADER_STORAGE_BUFFER, pathState_ID );
-	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( wf_PathState ) * rp.nTaskNum, NULL, GL_STATIC_DRAW );
-
 	glGenBuffers( 1, &queueCounter_ID );
 	glBindBuffer( GL_SHADER_STORAGE_BUFFER, queueCounter_ID );
 	glBufferData( GL_SHADER_STORAGE_BUFFER, sizeof( wf_queue_counter ), NULL, GL_STATIC_READ );
@@ -164,12 +159,11 @@ void Scene::buffer2GPU( GLuint &screenBuffer_ID, GLuint &rayBuffer_ID, GLuint &t
 	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 8, lightsNumBuffer_ID );
 
     glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 9, renderParameters_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 10, pathState_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 11, queueCounter_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 12, genQueue_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 13, materialsQueue_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 14, extensionQueue_ID );
-	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 15, shadowQueue_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 10, queueCounter_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 11, genQueue_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 12, materialsQueue_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 13, extensionQueue_ID );
+	glBindBufferBase( GL_SHADER_STORAGE_BUFFER, 14, shadowQueue_ID );
 }
 
 void Scene::resetQueue( GLuint &queueCounter_ID )

@@ -200,9 +200,7 @@
     <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shader\compute.glsl" />
     <None Include="shader\genRay.glsl" />
-    <None Include="shader\intersection.glsl" />
     <None Include="shader\quad.fragmentshader" />
     <None Include="shader\quad.vertexshader" />
     <None Include="shader\ssbo.glsl" />

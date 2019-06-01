@@ -3,6 +3,11 @@ layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
 
 //All SSBO should copy from ssbo.glsl
 ///////////////////////////////////////////////
+layout( std430, binding = 0 ) buffer SCREEN_BUFFER
+{
+	vec4 colors[];
+};
+
 struct RTRay
 {
 	vec3 pos;
@@ -41,7 +46,7 @@ struct RTRay
 	vec3 random_dir;
 	float brdf;
 
-    vec3 light_color;
+	vec3 light_color;
 };
 
 layout( std430, binding = 1 ) buffer RTRAY_BUFFER
@@ -124,6 +129,56 @@ layout( std430, binding = 4 ) buffer MATERIAL_BUFFER
 	RTMaterial materials[];
 };
 
+layout( std430, binding = 5 ) buffer TEXTURE_BUFFER
+{
+	float texture_buf[];
+};
+
+struct RTTexInfo
+{
+	int idx;
+	int offset;
+	int width;
+	int height;
+};
+
+layout( std430, binding = 6 ) buffer TexInfo_BUFFER
+{
+	RTTexInfo textureInfos[];
+};
+
+struct RTLightBoundary
+{
+	vec4 v1;
+	vec4 v2;
+	vec4 v3;
+	vec4 v4;
+	vec4 normal;
+};
+
+layout( std430, binding = 7 ) buffer LIGHT_BUFFER
+{
+	RTLightBoundary lights[];
+};
+
+layout( std430, binding = 8 ) buffer LIGHT_NUM_BUFFER
+{
+	int light_num;
+};
+
+struct RenderParameters
+{
+	uint nTaskNum;
+	uint nWidth;
+	uint nHeight;
+	uint nMaxBounces;
+};
+
+layout( std430, binding = 9 ) buffer RenderParameters_BUFFER
+{
+	RenderParameters rp;
+};
+
 struct wf_queue_counter
 {
 	uint raygenQueue;
@@ -132,27 +187,27 @@ struct wf_queue_counter
 	uint materialQueue;
 };
 
-layout( std430, binding = 11 ) buffer QueueCounter_BUFFER
+layout( std430, binding = 10 ) buffer QueueCounter_BUFFER
 {
 	wf_queue_counter qc;
 };
 
-layout( std430, binding = 12 ) buffer genQueue_BUFFER
+layout( std430, binding = 11 ) buffer genQueue_BUFFER
 {
-	uint genQueue[];
+	uint rayGenQueue[];
 };
 
-layout( std430, binding = 13 ) buffer materialQueue_BUFFER
+layout( std430, binding = 12 ) buffer materialQueue_BUFFER
 {
 	uint materialQueue[];
 };
 
-layout( std430, binding = 14 ) buffer ExtensionQueue_BUFFER
+layout( std430, binding = 13 ) buffer ExtensionQueue_BUFFER
 {
 	uint extensionQueue[];
 };
 
-layout( std430, binding = 15 ) buffer ShadowQueue_BUFFER
+layout( std430, binding = 14 ) buffer ShadowQueue_BUFFER
 {
 	uint shadowQueue[];
 };

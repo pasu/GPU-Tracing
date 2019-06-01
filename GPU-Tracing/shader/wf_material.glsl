@@ -47,7 +47,7 @@ struct RTRay
 	vec3 random_dir;
 	float brdf;
 
-    vec3 light_color;
+	vec3 light_color;
 };
 
 layout( std430, binding = 1 ) buffer RTRAY_BUFFER
@@ -188,41 +188,36 @@ struct wf_queue_counter
 	uint materialQueue;
 };
 
-layout( std430, binding = 11 ) buffer QueueCounter_BUFFER
+layout( std430, binding = 10 ) buffer QueueCounter_BUFFER
 {
 	wf_queue_counter qc;
 };
 
-layout( std430, binding = 12 ) buffer genQueue_BUFFER
+layout( std430, binding = 11 ) buffer genQueue_BUFFER
 {
 	uint rayGenQueue[];
 };
 
-layout( std430, binding = 13 ) buffer materialQueue_BUFFER
+layout( std430, binding = 12 ) buffer materialQueue_BUFFER
 {
 	uint materialQueue[];
 };
 
-layout( std430, binding = 14 ) buffer ExtensionQueue_BUFFER
+layout( std430, binding = 13 ) buffer ExtensionQueue_BUFFER
 {
 	uint extensionQueue[];
 };
 
-layout( std430, binding = 15 ) buffer ShadowQueue_BUFFER
+layout( std430, binding = 14 ) buffer ShadowQueue_BUFFER
 {
 	uint shadowQueue[];
 };
 ///////////////////////////////////////////////
 
 uint random_seed;
-uint SCRWIDTH = 800u;
-uint HALF_SCRWIDTH = 400u;
 
 const float very_large_float = 1e9f;
 const float very_small_float = 1e-9f;
-const uint SAMPLE_NUM = 16u * 16u;
-
-const vec4 color_scene = vec4( 0.13f, 1, 1, 0 );
 
 float xorshift32()
 {
@@ -663,9 +658,6 @@ float BalanceHeuristicWeight( float pdf1, float pdf2 )
 {
 	return ( pdf1 ) / ( pdf1 + pdf2 );
 }
-
-const int DIFFUSE = 1;
-const int maxRecursionDepth = 5;
 
 
 void main()
