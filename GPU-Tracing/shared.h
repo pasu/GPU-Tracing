@@ -19,3 +19,4 @@
 #define SAMPLE_NUM2 SAMPLE_NUM *SAMPLE_NUM
 
 //#define SAH_ON
+#define BIN_NUM 256

@@ -1,5 +1,5 @@
 #include "BVH.h"
-
+#include "../shared.h"
 #include <limits>
 
 BVH::BVH( std::vector<RTTriangle> &objects, uint32_t leafSize )
@@ -97,7 +97,7 @@ void BVH::build()
 		// Set the split dimensions
 		uint32_t split_dim = bc.maxDimension();
 		// Split on the center of the longest axis
-		float split_coord = .5f * ( bc.aabb_minaabb_min[split_dim] + bc.aabb_minaabb_max[split_dim] );
+		float split_coord = 0.5f * ( bc.aabb_minaabb_min[split_dim] + bc.aabb_minaabb_max[split_dim] );
 
 #ifdef SAH_ON
 		getSplitDimAndCoordBySAH( split_dim, split_coord, BIN_NUM, bc, start, end );

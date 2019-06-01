@@ -1,7 +1,7 @@
 ﻿#version 430
 layout( local_size_x = 32, local_size_y = 4, local_size_z = 1 ) in;
 layout( rgba8, binding = 0 ) writeonly uniform highp image2D destTex;
-
+#define MEASURE_BVH
 //All SSBO should copy from ssbo.glsl
 ///////////////////////////////////////////////
 layout( std430, binding = 0 ) buffer SCREEN_BUFFER
@@ -227,6 +227,10 @@ const uint SAMPLE_NUM = 16u * 16u;
 
 const vec4 color_scene = vec4( 0.13f, 1, 1, 0 );
 
+const float cost_traversal = 0.1;
+const float cost_intersectionTriangle = 0.5;
+const float cost_intersectionRectangle = 0.25;
+
 float xorshift32()
 {
 	random_seed ^= random_seed << 13;
@@ -339,12 +343,17 @@ struct RTIntersection
 	float v;
 	float distance;
 	int triangle_id;
+	float costV;
 };
 
 bool getIntersection( RTRay ray, out RTIntersection intersection )
 {
 	intersection.triangle_id = -1;
 	intersection.distance = -1.0f;
+
+#ifdef MEASURE_BVH
+	intersection.costV = 0.0f;
+#endif
 
 	float bbhits[4];
 	int closer, other;
@@ -359,6 +368,9 @@ bool getIntersection( RTRay ray, out RTIntersection intersection )
 
 	while ( stackptr >= 0 )
 	{
+#ifdef MEASURE_BVH
+		intersection.costV += cost_traversal;
+#endif
 		// Pop off the next node to work on.
 		int ni = todo[stackptr].i;
 		float fnear = todo[stackptr].mint;
@@ -380,6 +392,9 @@ bool getIntersection( RTRay ray, out RTIntersection intersection )
 			{
 				if ( intersectTriangle( ray, start + o, hitPnt ) )
 				{
+#ifdef MEASURE_BVH
+					intersection.costV += cost_intersectionTriangle;
+#endif
 					if ( intersection.distance < 0.0f || hitPnt.z < intersection.distance )
 					{
 						intersection.u = hitPnt.x;
@@ -399,6 +414,9 @@ bool getIntersection( RTRay ray, out RTIntersection intersection )
 										bvh_nodes[ni + rightOffset].aabb_minaabb_max, ray,
 										bbhits[2], bbhits[3] );
 
+#ifdef MEASURE_BVH
+			intersection.costV += cost_intersectionTriangle*2.0f;
+#endif
 			if ( hitc0 && hitc1 )
 			{
 
@@ -681,36 +699,7 @@ vec3 shade_diffuse( RTRay ray, RTIntersection intersection )
 
 	vec4 albedo = getAlbedoAtPoint( hitPnt );
 
-	color = albedo.xyz * color_scene.xyz;
-
-	for ( int i = 0; i < light_num; i++ )
-	{
-		vec3 pos_light, light_normal;
-		float area;
-		getRandomPnt( pos_light, light_normal, area );
-		//pos_light = ( lights[i].v1.xyz + lights[i].v3.xyz ) * 0.5f;
-		vec3 d = pos_light - hitPnt.position;
-		float l = length( d );
-		d = normalize( d );
-		RTRay shadowRay;
-		shadowRay.pos = hitPnt.position + shadowBias * d;
-		shadowRay.dir = d;
-
-		RTIntersection intersection_shadow;
-		if ( getIntersection( shadowRay, intersection_shadow ) )
-		{
-			SurfaceData hitPnt_light;
-			getSurfaceData( shadowRay, intersection_shadow, hitPnt_light );
-
-			RTMaterial material_light = materials[hitPnt_light.materialID];
-			if ( isLight( material_light ) )
-			{
-				float cosine = dot( d, lights[i].normal.xyz );
-				cosine = ( cosine > 0.0f ? cosine : 0.0f );
-				color += cosine * albedo.xyz * material_light.emission;
-			}
-		}
-	}
+	color = albedo.xyz;
 	return color;
 }
 
@@ -718,12 +707,24 @@ vec4 ray_sample( RTRay ray, RTIntersection intersection )
 {
 	vec3 finalColor = vec3( 1 );
 
+    //getIntersection( ray, intersection );
+	
 	if ( !getIntersection( ray, intersection ) )
 	{
-		return color_scene;
+		return vec4( 0.0f, 1.0f, 0.0f,1.0f);
 	}
+    
 
-	vec3 color_obj = shade_diffuse( ray, intersection );
+    float scaleV = intersection.costV / 100.0f; 
+    vec3 color_obj = vec3(0.0f); 
+    if (scaleV < 0.85)
+    {
+		color_obj = vec3( 0.0f, 1.0f - scaleV, 0.0f );
+    }
+    else
+    {
+		color_obj = vec3( scaleV, 0.0f, 0.0f );
+    }
 
 	return vec4( color_obj, 1.0f );
 }
@@ -893,8 +894,12 @@ void main()
 
 	RTIntersection intersection;
 
+#ifdef MEASURE_BVH
+	vec4 pixel = ray_sample( ray, intersection );
+#else
 	vec4 pixel = path_sample( ray, intersection, 0 );
-	//vec4 pixel = ray_sample( ray, intersection);
+#endif
+	
 
 	if ( frame_id == 0u )
 	{
