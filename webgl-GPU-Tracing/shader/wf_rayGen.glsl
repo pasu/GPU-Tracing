@@ -1,4 +1,4 @@
-﻿const wf_rayGen = `#version 310 es
+﻿#version 430
 layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
 
 //All SSBO should copy from ssbo.glsl
@@ -277,4 +277,3 @@ void main()
     uint extIdx = atomicAdd( qc.extensionQueue, 1u );
 	extensionQueue[extIdx] = gid;
 }
-`;

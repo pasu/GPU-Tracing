@@ -1,4 +1,4 @@
-﻿const wf_material = `#version 310 es
+﻿#version 430
 layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
 layout( rgba8, binding = 0 ) writeonly uniform highp image2D destTex;
 
@@ -507,120 +507,10 @@ void getSurfaceData( RTRay ray, RTIntersection intersection, out SurfaceData hit
 	return;
 }
 
-vec3 getTexelFromFile( RTTexInfo info, int x, int y )
-{
-	int offset = info.offset / 4;
-	int basePixel = ( x + ( ( ( info.height - 1 ) - y ) * info.width ) );
-	return vec3( texture_buf[offset + basePixel * 3], texture_buf[offset + basePixel * 3 + 1], texture_buf[offset + basePixel * 3 + 2] );
-}
-
-vec3 bilinearInterpolation( RTTexInfo info, float u, float v )
-{
-	int width = info.width;
-	int height = info.height;
-	float pu = float( width - 1 ) * u;
-	float pv = float( height - 1 ) * v;
-	int x = int( pu );
-	int y = int( pv );
-	float uPrime = pu - float( x );
-	float vPrime = pv - float( y );
-
-	int xl = x - 1 >= 0 ? x - 1 : width - 1;
-	int xr = x + 1 < width ? x + 1 : 0;
-	int yb = y - 1 >= 0 ? y - 1 : height - 1;
-	int yt = y + 1 < height ? y + 1 : 0;
-
-	return ( 1.0f - uPrime ) * ( 1.0f - vPrime ) * getTexelFromFile( info, xl, yb ) +
-		   uPrime * ( 1.0f - vPrime ) * getTexelFromFile( info, xr, yb ) +
-		   ( 1.0f - uPrime ) * vPrime * getTexelFromFile( info, xl, yt ) +
-		   uPrime * vPrime * getTexelFromFile( info, xr, yt );
-}
-
-vec3 getTexel( RTTexInfo info, float s, float t )
-{
-	vec2 scale = vec2( 1.0f );
-
-	s *= scale.x;
-	t *= scale.y;
-
-	float wrappedS = s - floor( s );
-	float wrappedT = t - floor( t );
-
-	return bilinearInterpolation( info, wrappedS, wrappedT );
-}
-
-vec4 getAlbedoAtPoint( SurfaceData hitPnt )
-{
-	RTMaterial material = materials[hitPnt.materialID];
-
-	if ( material.texID == -1 )
-	{
-		return vec4( material.color, 1.0 );
-	}
-	else
-	{
-		int texInfoID = material.texID;
-		return vec4( getTexel( textureInfos[texInfoID], hitPnt.texCoord.x, hitPnt.texCoord.y ), 1.0f );
-	}
-}
-
 const float RT_PI = 3.1415926535897f;
 const float INV_PI = 1.0f / RT_PI;
 const float shadowBias = 3.1f;
 
-vec3 sampleCosHemisphere( vec3 normal )
-{
-	vec3 u, v, w;
-	w = normal;
-
-	if ( abs( w.x ) > abs( w.y ) )
-		u = normalize( cross( vec3( 0, 1, 0 ), w ) );
-	else
-		u = normalize( cross( vec3( 1, 0, 0 ), w ) );
-
-	v = cross( w, u );
-
-	float a = xorshift32(), b = xorshift32();
-	float sini = sqrt( a ), cosi = 2.0f * RT_PI * b;
-
-	return normalize( ( sini * cos( cosi ) * u ) + ( sini * sin( cosi ) * v ) + ( sqrt( 1.0f - a ) * w ) );
-}
-
-vec3 random_in_unit_sphere()
-{
-	vec3 vec;
-
-	do
-	{
-		vec = 2.0f * vec3( xorshift32(), xorshift32(), xorshift32() ) - vec3( 1.0f, 1.0f, 1.0f );
-	} while ( length( vec ) >= 1.0f );
-
-	return normalize( vec );
-}
-
-void sampleDiffuse( vec3 normal, out vec3 in_dir, out float pdf )
-{
-	in_dir = sampleCosHemisphere( normal );
-	pdf = dot( normal, in_dir ) * INV_PI;
-}
-
-bool evaluate( RTMaterial material, RTRay ray, SurfaceData hitPnt,
-			   out vec3 random_dir, out float pdf, out vec4 albedo )
-{
-	albedo = getAlbedoAtPoint( hitPnt );
-
-	switch ( material.shadingType )
-	{
-	case 1:
-		sampleDiffuse( hitPnt.normal, random_dir, pdf );
-		return true;
-		break;
-	default:
-		break;
-	}
-
-	return false;
-}
 
 float material_brdf( RTMaterial material, RTRay ray, SurfaceData hitPnt, RTRay ray_random )
 {
@@ -659,15 +549,18 @@ float BalanceHeuristicWeight( float pdf1, float pdf2 )
 	return ( pdf1 ) / ( pdf1 + pdf2 );
 }
 
+const int DIFFUSE = 1;
+const int maxRecursionDepth = 5;
+
 
 void main()
 {
 	uint globalIdx = gl_GlobalInvocationID.x;
 
-	if ( globalIdx > qc.materialQueue )
+	if ( globalIdx > qc.shadowQueue )
 		return;
 
-	uint gid = materialQueue[globalIdx];
+	uint gid = shadowQueue[globalIdx];
 
     SurfaceData hitPnt;
 	hitPnt.position = rays[gid].hit_position;
@@ -677,13 +570,52 @@ void main()
 
     RTMaterial material = materials[hitPnt.materialID];
 
-    bool bContinue = evaluate( material, rays[gid], hitPnt, rays[gid].random_dir, rays[gid].pdf_hemi_brdf, rays[gid].albedo );
-	rays[gid].bContinue = uint( bContinue );
+    rays[gid].shadowRayBlocked = 1;
+    // NEE
+	if ( ( material.shadingType & DIFFUSE ) == 1 )
+	{
 
-    RTRay ray_random;
-	ray_random.pos = hitPnt.position + shadowBias * rays[gid].random_dir;
-	ray_random.dir = rays[gid].random_dir;
-	rays[gid].brdf = material_brdf( material, rays[gid], hitPnt, ray_random );
+		vec3 pos, light_normal;
+		float area;
+		getRandomPnt( pos, light_normal, area );
+		vec3 Pnt2light = pos - hitPnt.position;
+		float distance2light = length( Pnt2light );
+
+		Pnt2light = normalize( Pnt2light );
+
+		if ( dot( Pnt2light, hitPnt.normal ) > 0.0f && dot( Pnt2light, light_normal ) <= 0.0f )
+		{
+			vec3 org = hitPnt.position + shadowBias * Pnt2light;
+			RTRay lightSample;
+			lightSample.pos = org;
+			lightSample.dir = Pnt2light;
+
+			RTIntersection intersection_light;
+			if ( getIntersection( lightSample, intersection_light ) )
+			{
+				SurfaceData hitPnt_light;
+				getSurfaceData( lightSample, intersection_light, hitPnt_light );
+				RTMaterial material_light = materials[hitPnt_light.materialID];
+
+				// light material, MIS
+				if ( isLight( material_light ) )
+				{
+					float solidAngle = dot( Pnt2light, light_normal ) * -1.0f * area / ( distance2light * distance2light );
+					float pdf_light_nee = 1.0f / solidAngle;
+
+					float pdf_brdf = dot( Pnt2light, hitPnt.normal ) * INV_PI;
+
+					float w1 = BalanceHeuristicWeight( pdf_brdf, pdf_light_nee );
+					float w2 = 1.0f - w1;
+
+					float pdf_mis_nee = w1 * pdf_brdf + w2 * pdf_light_nee;
+
+					rays[gid].light_color = rays[gid].brdf_weight * material_light.emission * ( 1.0 / pdf_mis_nee ) * rays[gid].albedo.xyz * material_brdf( material, rays[gid], hitPnt, lightSample ) * INV_PI;
+
+                    rays[gid].shadowRayBlocked = 0;
+				}
+			}
+		}
+	}
 
 }
-`;

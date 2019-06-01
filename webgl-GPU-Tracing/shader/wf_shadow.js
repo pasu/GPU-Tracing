@@ -47,7 +47,7 @@ struct RTRay
 	vec3 random_dir;
 	float brdf;
 
-    vec3 light_color;
+	vec3 light_color;
 };
 
 layout( std430, binding = 1 ) buffer RTRAY_BUFFER
@@ -188,41 +188,36 @@ struct wf_queue_counter
 	uint materialQueue;
 };
 
-layout( std430, binding = 11 ) buffer QueueCounter_BUFFER
+layout( std430, binding = 10 ) buffer QueueCounter_BUFFER
 {
 	wf_queue_counter qc;
 };
 
-layout( std430, binding = 12 ) buffer genQueue_BUFFER
+layout( std430, binding = 11 ) buffer genQueue_BUFFER
 {
 	uint rayGenQueue[];
 };
 
-layout( std430, binding = 13 ) buffer materialQueue_BUFFER
+layout( std430, binding = 12 ) buffer materialQueue_BUFFER
 {
 	uint materialQueue[];
 };
 
-layout( std430, binding = 14 ) buffer ExtensionQueue_BUFFER
+layout( std430, binding = 13 ) buffer ExtensionQueue_BUFFER
 {
 	uint extensionQueue[];
 };
 
-layout( std430, binding = 15 ) buffer ShadowQueue_BUFFER
+layout( std430, binding = 14 ) buffer ShadowQueue_BUFFER
 {
 	uint shadowQueue[];
 };
 ///////////////////////////////////////////////
 
 uint random_seed;
-uint SCRWIDTH = 800u;
-uint HALF_SCRWIDTH = 400u;
 
 const float very_large_float = 1e9f;
 const float very_small_float = 1e-9f;
-const uint SAMPLE_NUM = 16u * 16u;
-
-const vec4 color_scene = vec4( 0.13f, 1, 1, 0 );
 
 float xorshift32()
 {
@@ -512,120 +507,10 @@ void getSurfaceData( RTRay ray, RTIntersection intersection, out SurfaceData hit
 	return;
 }
 
-vec3 getTexelFromFile( RTTexInfo info, int x, int y )
-{
-	int offset = info.offset / 4;
-	int basePixel = ( x + ( ( ( info.height - 1 ) - y ) * info.width ) );
-	return vec3( texture_buf[offset + basePixel * 3], texture_buf[offset + basePixel * 3 + 1], texture_buf[offset + basePixel * 3 + 2] );
-}
-
-vec3 bilinearInterpolation( RTTexInfo info, float u, float v )
-{
-	int width = info.width;
-	int height = info.height;
-	float pu = float( width - 1 ) * u;
-	float pv = float( height - 1 ) * v;
-	int x = int( pu );
-	int y = int( pv );
-	float uPrime = pu - float( x );
-	float vPrime = pv - float( y );
-
-	int xl = x - 1 >= 0 ? x - 1 : width - 1;
-	int xr = x + 1 < width ? x + 1 : 0;
-	int yb = y - 1 >= 0 ? y - 1 : height - 1;
-	int yt = y + 1 < height ? y + 1 : 0;
-
-	return ( 1.0f - uPrime ) * ( 1.0f - vPrime ) * getTexelFromFile( info, xl, yb ) +
-		   uPrime * ( 1.0f - vPrime ) * getTexelFromFile( info, xr, yb ) +
-		   ( 1.0f - uPrime ) * vPrime * getTexelFromFile( info, xl, yt ) +
-		   uPrime * vPrime * getTexelFromFile( info, xr, yt );
-}
-
-vec3 getTexel( RTTexInfo info, float s, float t )
-{
-	vec2 scale = vec2( 1.0f );
-
-	s *= scale.x;
-	t *= scale.y;
-
-	float wrappedS = s - floor( s );
-	float wrappedT = t - floor( t );
-
-	return bilinearInterpolation( info, wrappedS, wrappedT );
-}
-
-vec4 getAlbedoAtPoint( SurfaceData hitPnt )
-{
-	RTMaterial material = materials[hitPnt.materialID];
-
-	if ( material.texID == -1 )
-	{
-		return vec4( material.color, 1.0 );
-	}
-	else
-	{
-		int texInfoID = material.texID;
-		return vec4( getTexel( textureInfos[texInfoID], hitPnt.texCoord.x, hitPnt.texCoord.y ), 1.0f );
-	}
-}
-
 const float RT_PI = 3.1415926535897f;
 const float INV_PI = 1.0f / RT_PI;
 const float shadowBias = 3.1f;
 
-vec3 sampleCosHemisphere( vec3 normal )
-{
-	vec3 u, v, w;
-	w = normal;
-
-	if ( abs( w.x ) > abs( w.y ) )
-		u = normalize( cross( vec3( 0, 1, 0 ), w ) );
-	else
-		u = normalize( cross( vec3( 1, 0, 0 ), w ) );
-
-	v = cross( w, u );
-
-	float a = xorshift32(), b = xorshift32();
-	float sini = sqrt( a ), cosi = 2.0f * RT_PI * b;
-
-	return normalize( ( sini * cos( cosi ) * u ) + ( sini * sin( cosi ) * v ) + ( sqrt( 1.0f - a ) * w ) );
-}
-
-vec3 random_in_unit_sphere()
-{
-	vec3 vec;
-
-	do
-	{
-		vec = 2.0f * vec3( xorshift32(), xorshift32(), xorshift32() ) - vec3( 1.0f, 1.0f, 1.0f );
-	} while ( length( vec ) >= 1.0f );
-
-	return normalize( vec );
-}
-
-void sampleDiffuse( vec3 normal, out vec3 in_dir, out float pdf )
-{
-	in_dir = sampleCosHemisphere( normal );
-	pdf = dot( normal, in_dir ) * INV_PI;
-}
-
-bool evaluate( RTMaterial material, RTRay ray, SurfaceData hitPnt,
-			   out vec3 random_dir, out float pdf, out vec4 albedo )
-{
-	albedo = getAlbedoAtPoint( hitPnt );
-
-	switch ( material.shadingType )
-	{
-	case 1:
-		sampleDiffuse( hitPnt.normal, random_dir, pdf );
-		return true;
-		break;
-	default:
-		break;
-	}
-
-	return false;
-}
 
 float material_brdf( RTMaterial material, RTRay ray, SurfaceData hitPnt, RTRay ray_random )
 {

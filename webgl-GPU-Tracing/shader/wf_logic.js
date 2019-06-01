@@ -35,19 +35,19 @@ struct RTRay
 	vec3 hit_normal;
 	int shadowRayBlocked;
 
-    vec3 finalColor;
+	vec3 finalColor;
 	uint bounceNum;
 
-    vec4 albedo;
+	vec4 albedo;
 
 	vec2 hit_texCoord;
 	uint bContinue;
 	float pdf_hemi_brdf;
 
-    vec3 random_dir;
+	vec3 random_dir;
 	float brdf;
 
-    vec3 light_color;
+	vec3 light_color;
 };
 
 layout( std430, binding = 1 ) buffer RTRAY_BUFFER
@@ -188,27 +188,27 @@ struct wf_queue_counter
 	uint materialQueue;
 };
 
-layout( std430, binding = 11 ) buffer QueueCounter_BUFFER
+layout( std430, binding = 10 ) buffer QueueCounter_BUFFER
 {
 	wf_queue_counter qc;
 };
 
-layout( std430, binding = 12 ) buffer genQueue_BUFFER
+layout( std430, binding = 11 ) buffer genQueue_BUFFER
 {
 	uint rayGenQueue[];
 };
 
-layout( std430, binding = 13 ) buffer materialQueue_BUFFER
+layout( std430, binding = 12 ) buffer materialQueue_BUFFER
 {
 	uint materialQueue[];
 };
 
-layout( std430, binding = 14 ) buffer ExtensionQueue_BUFFER
+layout( std430, binding = 13 ) buffer ExtensionQueue_BUFFER
 {
 	uint extensionQueue[];
 };
 
-layout( std430, binding = 15 ) buffer ShadowQueue_BUFFER
+layout( std430, binding = 14 ) buffer ShadowQueue_BUFFER
 {
 	uint shadowQueue[];
 };
@@ -901,7 +901,6 @@ void main()
 
 	bool bTerminate = path_sample( gid, intersection, 0 );
 
-	imageStore( destTex, ivec2( xId, yId ), vec4(1.0f,0.0f,0.0f,1.0f) );
     if (bTerminate)
     {
 		add_vec4( curIdx, rays[gid].finalColor );

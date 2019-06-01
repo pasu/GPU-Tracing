@@ -1,8 +1,7 @@
-﻿const wf_rayGen = `#version 310 es
-layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
-
-//All SSBO should copy from ssbo.glsl
-///////////////////////////////////////////////
+﻿#version 430
+layout( local_size_x = 32, local_size_y = 4, local_size_z = 1 ) in;
+// SSBO
+//////////////////////////////////////////////////////
 layout( std430, binding = 0 ) buffer SCREEN_BUFFER
 {
 	vec4 colors[];
@@ -211,13 +210,13 @@ layout( std430, binding = 14 ) buffer ShadowQueue_BUFFER
 {
 	uint shadowQueue[];
 };
-////////////////////////////////////////////////////////////////////
-
+//////////////////////////////////////////////////////
 uniform uint frame_id;
-uniform uint total_num;
 uniform mat4 mvMatrix;
 
 uint random_seed;
+uint SCRWIDTH = 800u;
+uint HALF_SCRWIDTH = 400u;
 
 const float very_large_float = 1e9f;
 
@@ -246,35 +245,13 @@ void primaryRay( in uint x, in uint y, out RTRay ray )
 
 void main()
 {
-	uint globalIdx = gl_GlobalInvocationID.x;
-
-    if ( globalIdx > qc.raygenQueue )
-		return;
-
-	uint gid = rayGenQueue[globalIdx];
-	uint curIdx = globalIdx + total_num;
-	curIdx = curIdx % ( rp.nWidth * rp.nHeight );
-
-	uint xId = curIdx % rp.nWidth;
-	uint yId = curIdx / rp.nWidth;
+	ivec2 storePos = ivec2( gl_GlobalInvocationID.xy );
 
 	uint largePrime1 = 386030683u;
 	uint largePrime2 = 919888919u;
 	uint largePrime3 = 101414101u;
 
-	random_seed = ( ( xId * largePrime1 + yId ) * largePrime1 + frame_id * largePrime3 );
-
-	primaryRay( xId, yId, rays[gid] );
-    rays[gid].pixelIdx = curIdx;
-
-    rays[gid].finalColor = vec3( 0 );
-	rays[gid].color_obj = vec3( 1 );
-	rays[gid].brdf_weight = vec3( 1.0f );
-	rays[gid].pre_pdf_hemi_brdf = 1.0f;
-	rays[gid].bounceNum = 0u;
-	rays[gid].albedo = vec4( 0.0f );
-
-    uint extIdx = atomicAdd( qc.extensionQueue, 1u );
-	extensionQueue[extIdx] = gid;
+	random_seed = ( ( uint( storePos.x ) * largePrime1 + uint( storePos.y ) ) * largePrime1 + frame_id * largePrime3 );
+	int idx = storePos.y * int( SCRWIDTH ) + storePos.x;
+	primaryRay( gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rays[idx] );
 }
-`;

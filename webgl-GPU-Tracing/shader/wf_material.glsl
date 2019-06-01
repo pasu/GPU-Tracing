@@ -1,4 +1,4 @@
-﻿const wf_material = `#version 310 es
+﻿#version 430
 layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
 layout( rgba8, binding = 0 ) writeonly uniform highp image2D destTex;
 
@@ -686,4 +686,3 @@ void main()
 	rays[gid].brdf = material_brdf( material, rays[gid], hitPnt, ray_random );
 
 }
-`;

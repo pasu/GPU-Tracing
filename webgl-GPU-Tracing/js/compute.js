@@ -6,6 +6,8 @@ var frame_id = 0;
 var total_num = 0;
 var qc = new Uint32Array(4);
 
+var bWaveFront = 1;
+
 var requestFiles = ["triangles.bin","bvh.bin","material.bin","texture.bin","texIn.bin","lights.bin","lights_num.bin"];
 var scene_buffer = [];
 
@@ -129,11 +131,11 @@ function buffer2GPU(gl)
   gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER, 8, lightsNumBuffer_ID);
 
   gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 9, renderParameters_ID );
-	gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 11, queueCounter_ID );
-	gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 12, genQueue_ID );
-	gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 13, materialsQueue_ID );
-	gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 14, extensionQueue_ID );
-  gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 15, shadowQueue_ID );
+	gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 10, queueCounter_ID );
+	gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 11, genQueue_ID );
+	gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 12, materialsQueue_ID );
+	gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 13, extensionQueue_ID );
+  gl.bindBufferBase( gl.SHADER_STORAGE_BUFFER, 14, shadowQueue_ID );
   
   return queueCounter_ID;
 }
@@ -263,6 +265,45 @@ function loadWavefrontshader(context)
     }
 }
 
+var genRay_SID,tracingRay_SID;
+function loadmegaKernelshader(context)
+{
+  // create WebGLShader for ComputeShader
+  const genRayShader = context.createShader(context.COMPUTE_SHADER);
+  context.shaderSource(genRayShader, genRayShaderSource);
+  context.compileShader(genRayShader);
+  if (!context.getShaderParameter(genRayShader, context.COMPILE_STATUS)) {
+    console.log(context.getShaderInfoLog(genRayShader));
+    return;
+  }
+
+  // create WebGLProgram for ComputeShader
+  genRay_SID = context.createProgram();
+  context.attachShader(genRay_SID, genRayShader);
+  context.linkProgram(genRay_SID);
+  if (!context.getProgramParameter(genRay_SID, context.LINK_STATUS)) {
+    console.log(context.getProgramInfoLog(genRay_SID));
+    return;
+  }
+
+  const tracingRayShader = context.createShader(context.COMPUTE_SHADER);
+  context.shaderSource(tracingRayShader, tracingRayShaderSource);
+  context.compileShader(tracingRayShader);
+  if (!context.getShaderParameter(tracingRayShader, context.COMPILE_STATUS)) {
+    console.log(context.getShaderInfoLog(tracingRayShader));
+    return;
+  }
+
+  // create WebGLProgram for ComputeShader
+  tracingRay_SID = context.createProgram();
+  context.attachShader(tracingRay_SID, tracingRayShader);
+  context.linkProgram(tracingRay_SID);
+  if (!context.getProgramParameter(tracingRay_SID, context.LINK_STATUS)) {
+    console.log(context.getProgramInfoLog(tracingRay_SID));
+    return;
+  }
+}
+
 function main() {  
   var canvas = document.getElementById('webgl');
   var stats = new Stats();
@@ -289,44 +330,15 @@ function main() {
   }
 
   Promise.all(promise_list).then(function(){
-    loadWavefrontshader(context);
-    // create WebGLShader for ComputeShader
-    const genRayShader = context.createShader(context.COMPUTE_SHADER);
-    context.shaderSource(genRayShader, genRayShaderSource);
-    context.compileShader(genRayShader);
-    if (!context.getShaderParameter(genRayShader, context.COMPILE_STATUS)) {
-      console.log(context.getShaderInfoLog(genRayShader));
-      return;
-    }
 
-    // create WebGLProgram for ComputeShader
-    const genRay_SID = context.createProgram();
-    context.attachShader(genRay_SID, genRayShader);
-    context.linkProgram(genRay_SID);
-    if (!context.getProgramParameter(genRay_SID, context.LINK_STATUS)) {
-      console.log(context.getProgramInfoLog(genRay_SID));
-      return;
+    if(bWaveFront){
+      loadWavefrontshader(context);
     }
-
-    const tracingRayShader = context.createShader(context.COMPUTE_SHADER);
-    context.shaderSource(tracingRayShader, tracingRayShaderSource);
-    context.compileShader(tracingRayShader);
-    if (!context.getShaderParameter(tracingRayShader, context.COMPILE_STATUS)) {
-      console.log(context.getShaderInfoLog(tracingRayShader));
-      return;
+    else{
+      loadmegaKernelshader(context);
     }
-
-    // create WebGLProgram for ComputeShader
-    const tracingRay_SID = context.createProgram();
-    context.attachShader(tracingRay_SID, tracingRayShader);
-    context.linkProgram(tracingRay_SID);
-    if (!context.getProgramParameter(tracingRay_SID, context.LINK_STATUS)) {
-      console.log(context.getProgramInfoLog(tracingRay_SID));
-      return;
-    }
-    ///////////////////////////////////////////////////////
+    
     buffer2GPU(context);
-    /////////////////////////////////////////////////////////
 
     // create texture for ComputeShader write to
     const texture = context.createTexture();
@@ -359,7 +371,8 @@ function main() {
 			  frame_id = 0;
       }
 
-      if(frame_id == 0)
+      if(bWaveFront){
+        if(frame_id == 0)
       {
         total_num = 0;
 
@@ -424,6 +437,20 @@ function main() {
 
         context.bindBuffer(context.SHADER_STORAGE_BUFFER, queueCounter_ID);
         context.getBufferSubData(context.SHADER_STORAGE_BUFFER, 0, qc);
+      }
+      }
+      else{
+        context.useProgram(genRay_SID);
+        context.uniform1ui( context.getUniformLocation( genRay_SID, "frame_id" ), frame_id );
+
+        context.uniformMatrix4fv(context.getUniformLocation(genRay_SID, 'mvMatrix'),false,mvMatrix);
+        context.dispatchCompute(CANVAS_WIDTH / 32, CANVAS_HEIGHT / 4, 1);
+
+        context.useProgram(tracingRay_SID);
+        context.uniform1ui( context.getUniformLocation( tracingRay_SID, "frame_id" ), frame_id++ );
+
+        context.uniformMatrix4fv(context.getUniformLocation(tracingRay_SID, 'mvMatrix'),false,mvMatrix);
+        context.dispatchCompute(CANVAS_WIDTH / 32, CANVAS_HEIGHT / 4, 1);
       }
 
       context.memoryBarrier(context.SHADER_IMAGE_ACCESS_BARRIER_BIT);

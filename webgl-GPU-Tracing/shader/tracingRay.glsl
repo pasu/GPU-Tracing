@@ -1,5 +1,5 @@
-﻿const wf_material = `#version 310 es
-layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
+﻿#version 430
+layout( local_size_x = 32, local_size_y = 4, local_size_z = 1 ) in;
 layout( rgba8, binding = 0 ) writeonly uniform highp image2D destTex;
 
 //All SSBO should copy from ssbo.glsl
@@ -214,10 +214,18 @@ layout( std430, binding = 14 ) buffer ShadowQueue_BUFFER
 };
 ///////////////////////////////////////////////
 
+uniform uint frame_id;
+uniform mat4 mvMatrix;
+
 uint random_seed;
+uint SCRWIDTH = 800u;
+uint HALF_SCRWIDTH = 400u;
 
 const float very_large_float = 1e9f;
 const float very_small_float = 1e-9f;
+const uint SAMPLE_NUM = 16u * 16u;
+
+const vec4 color_scene = vec4( 0.13f, 1, 1, 0 );
 
 float xorshift32()
 {
@@ -244,8 +252,8 @@ bool isLight( RTMaterial material )
 
 bool intersectAABB( vec3 aabb_min, vec3 aabb_max, RTRay ray, out float near, out float far )
 {
-	vec3 origin = ray.pos;
-	vec3 dir = ray.dir;
+	vec3 origin = ray.pos.xyz;
+	vec3 dir = ray.dir.xyz;
 	float local_tMin = 0.001;
 	float tMax = very_large_float;
 	for ( int i = 0; i < 3; i++ )
@@ -278,8 +286,8 @@ bool intersectTriangle( RTRay ray, RTTriangle t, out vec3 pnt )
 {
 	pnt = vec3( -1, -1, -1 );
 
-	vec3 origin = ray.pos;
-	vec3 dir = ray.dir;
+	vec3 origin = ray.pos.xyz;
+	vec3 dir = ray.dir.xyz;
 
 	vec3 a = vec3( t.vertices0_0, t.vertices0_1, t.vertices0_2 );
 	vec3 b = vec3( t.vertices1_0, t.vertices1_1, t.vertices1_2 );
@@ -478,7 +486,7 @@ void getSurfaceData( RTRay ray, RTIntersection intersection, out SurfaceData hit
 {
 	RTTriangle tri = triangles[intersection.triangle_id];
 
-	hitPnt.position = ray.pos + ray.dir * intersection.distance;
+	hitPnt.position = ray.pos.xyz + ray.dir.xyz * intersection.distance;
 
 	vec3 tv1 = vec3( tri.vertices0_0, tri.vertices0_1, tri.vertices0_2 );
 	vec3 tv2 = vec3( tri.vertices1_0, tri.vertices1_1, tri.vertices1_2 );
@@ -622,7 +630,7 @@ bool evaluate( RTMaterial material, RTRay ray, SurfaceData hitPnt,
 	return false;
 }
 
-float material_brdf( RTMaterial material, RTRay ray, SurfaceData hitPnt, RTRay ray_random )
+float brdf( RTMaterial material, RTRay ray, SurfaceData hitPnt, RTRay ray_random )
 {
 	float cosine = 0.0f;
 	vec3 reflect_dir;
@@ -630,7 +638,7 @@ float material_brdf( RTMaterial material, RTRay ray, SurfaceData hitPnt, RTRay r
 	switch ( material.shadingType )
 	{
 	case 1:
-		cosine = dot( hitPnt.normal, ray_random.dir );
+		cosine = dot( hitPnt.normal, ray_random.dir.xyz );
 		cosine = cosine < 0.0 ? 0.0f : cosine;
 		return cosine * INV_PI;
 		break;
@@ -659,31 +667,246 @@ float BalanceHeuristicWeight( float pdf1, float pdf2 )
 	return ( pdf1 ) / ( pdf1 + pdf2 );
 }
 
+const int DIFFUSE = 1;
+const int maxRecursionDepth = 5;
+
+vec3 shade_diffuse( RTRay ray, RTIntersection intersection )
+{
+	SurfaceData hitPnt;
+	getSurfaceData( ray, intersection, hitPnt );
+
+	vec3 color = vec3( 0.0f );
+
+	RTMaterial material = materials[hitPnt.materialID];
+
+	vec4 albedo = getAlbedoAtPoint( hitPnt );
+
+	color = albedo.xyz * color_scene.xyz;
+
+	for ( int i = 0; i < light_num; i++ )
+	{
+		vec3 pos_light, light_normal;
+		float area;
+		getRandomPnt( pos_light, light_normal, area );
+		//pos_light = ( lights[i].v1.xyz + lights[i].v3.xyz ) * 0.5f;
+		vec3 d = pos_light - hitPnt.position;
+		float l = length( d );
+		d = normalize( d );
+		RTRay shadowRay;
+		shadowRay.pos = hitPnt.position + shadowBias * d;
+		shadowRay.dir = d;
+
+		RTIntersection intersection_shadow;
+		if ( getIntersection( shadowRay, intersection_shadow ) )
+		{
+			SurfaceData hitPnt_light;
+			getSurfaceData( shadowRay, intersection_shadow, hitPnt_light );
+
+			RTMaterial material_light = materials[hitPnt_light.materialID];
+			if ( isLight( material_light ) )
+			{
+				float cosine = dot( d, lights[i].normal.xyz );
+				cosine = ( cosine > 0.0f ? cosine : 0.0f );
+				color += cosine * albedo.xyz * material_light.emission;
+			}
+		}
+	}
+	return color;
+}
+
+vec4 ray_sample( RTRay ray, RTIntersection intersection )
+{
+	vec3 finalColor = vec3( 1 );
+
+	if ( !getIntersection( ray, intersection ) )
+	{
+		return color_scene;
+	}
+
+	vec3 color_obj = shade_diffuse( ray, intersection );
+
+	return vec4( color_obj, 1.0f );
+}
+vec4 path_sample( RTRay ray, RTIntersection intersection, int depth )
+{
+	vec3 finalColor = vec3( 0 );
+	vec3 color_obj = vec3( 1 );
+	vec3 brdf_weight = vec3( 1.0f );
+	float pre_pdf_hemi_brdf = 1.0f;
+
+	vec4 albedo;
+
+	int i = 0;
+	int nThreshold = maxRecursionDepth * 4;
+	//nThreshold = 2;
+	for ( i = 0; i < nThreshold; i++, depth++ )
+	{
+		if ( !getIntersection( ray, intersection ) )
+		{
+			color_obj = brdf_weight * color_obj * color_scene.xyz;
+			break;
+		}
+
+		SurfaceData hitPnt;
+		getSurfaceData( ray, intersection, hitPnt );
+		RTMaterial material = materials[hitPnt.materialID];
+
+		// light material, MIS
+		if ( isLight( material ) )
+		{
+			if ( i == 0 )
+			{
+				color_obj = material.emission;
+			}
+			else
+			{
+				vec3 pos, light_normal;
+				float area;
+				getRandomPnt( pos, light_normal, area );
+
+				float distance2 = intersection.distance * intersection.distance;
+
+				float solidAngle = dot( ray.dir.xyz, light_normal ) * -1.0f * area / distance2;
+
+				float pdf_hemi_nee = 1.0f / solidAngle;
+
+				float w1 = BalanceHeuristicWeight( pre_pdf_hemi_brdf, pdf_hemi_nee );
+				float w2 = 1.0f - w1;
+
+				float light_w = w1 * pre_pdf_hemi_brdf + w2 * pdf_hemi_nee;
+
+				color_obj = brdf_weight * pre_pdf_hemi_brdf / light_w * color_obj * material.emission;
+			}
+			break;
+		}
+
+		float pdf_hemi_brdf, pdf_light_nee = 0.0f;
+		float weight_indirect = 1.0f, weight_direct = 0.0f;
+
+		vec3 random_dir;
+		bool bContinue = evaluate( material, ray, hitPnt, random_dir, pdf_hemi_brdf, albedo );
+		if ( !bContinue )
+		{
+			color_obj = brdf_weight * color_obj * albedo.xyz;
+			break;
+		}
+
+        // Russian roulette
+		float max = max( albedo.x, max( albedo.y, albedo.z ) );
+		if ( depth > maxRecursionDepth )
+		{
+			if ( xorshift32() < max )
+			{
+				// Make up for the loss
+				albedo *= ( 1.0 / max );
+			}
+			else
+			{
+				color_obj = brdf_weight * color_obj * color_scene.xyz;
+				break;
+			}
+		}
+
+		RTRay ray_random;
+		ray_random.pos = hitPnt.position + shadowBias * random_dir;
+		ray_random.dir = random_dir;
+
+		// NEE
+		if ( ( material.shadingType & DIFFUSE ) == 1 )
+		{
+
+			vec3 pos, light_normal;
+			float area;
+			getRandomPnt( pos, light_normal, area );
+			vec3 Pnt2light = pos - hitPnt.position;
+			float distance2light = length( Pnt2light );
+
+			Pnt2light = normalize( Pnt2light );
+
+			if ( dot( Pnt2light, hitPnt.normal ) > 0.0f && dot( Pnt2light, light_normal ) <= 0.0f )
+			{
+				vec3 org = hitPnt.position + shadowBias * Pnt2light;
+				RTRay lightSample;
+				lightSample.pos = org;
+				lightSample.dir = Pnt2light;
+
+				RTIntersection intersection_light;
+				if ( getIntersection( lightSample, intersection_light ) )
+				{
+					SurfaceData hitPnt_light;
+					getSurfaceData( lightSample, intersection_light, hitPnt_light );
+					RTMaterial material_light = materials[hitPnt_light.materialID];
+
+					// light material, MIS
+					if ( isLight( material_light ) )
+					{
+						float solidAngle = dot( Pnt2light, light_normal ) * -1.0f * area / ( distance2light * distance2light );
+						pdf_light_nee = 1.0f / solidAngle;
+
+						float pdf_brdf = dot( Pnt2light, hitPnt.normal ) * INV_PI;
+
+						float w1 = BalanceHeuristicWeight( pdf_brdf, pdf_light_nee );
+						float w2 = 1.0f - w1;
+
+						float pdf_mis_nee = w1 * pdf_brdf + w2 * pdf_light_nee;
+
+						vec3 color = brdf_weight * material_light.emission * ( 1.0 / pdf_mis_nee ) * albedo.xyz * brdf( material, ray, hitPnt, lightSample ) * INV_PI;
+
+						finalColor += color;
+					}
+				}
+			}
+		}
+
+		brdf_weight = brdf_weight * albedo.xyz * brdf( material, ray, hitPnt, ray_random ) * ( 1.0f / pdf_hemi_brdf ) * INV_PI;
+
+		ray.pos = ray_random.pos;
+		ray.dir = ray_random.dir;
+
+		pre_pdf_hemi_brdf = pdf_hemi_brdf;
+	}
+
+	finalColor += color_obj;
+
+	return vec4( finalColor, 1.0f );
+}
 
 void main()
 {
-	uint globalIdx = gl_GlobalInvocationID.x;
+	ivec2 storePos = ivec2( gl_GlobalInvocationID.xy );
 
-	if ( globalIdx > qc.materialQueue )
+	int idx = storePos.y * int( SCRWIDTH ) + storePos.x;
+
+	uint largePrime1 = 386030683u;
+	uint largePrime2 = 919888919u;
+	uint largePrime3 = 101414101u;
+
+	random_seed = ( ( uint( storePos.x ) * largePrime1 + uint( storePos.y ) ) * largePrime1 + frame_id * largePrime3 );
+
+	if ( SAMPLE_NUM < frame_id )
+	{
+		imageStore( destTex, storePos, colors[idx] );
 		return;
+	}
 
-	uint gid = materialQueue[globalIdx];
+	RTRay ray = rays[idx];
 
-    SurfaceData hitPnt;
-	hitPnt.position = rays[gid].hit_position;
-	hitPnt.normal = rays[gid].hit_normal;
-	hitPnt.texCoord = rays[gid].hit_texCoord;
-	hitPnt.materialID = rays[gid].hit_materialID;
+	RTIntersection intersection;
 
-    RTMaterial material = materials[hitPnt.materialID];
+	vec4 pixel = path_sample( ray, intersection, 0 );
+	//vec4 pixel = ray_sample( ray, intersection);
 
-    bool bContinue = evaluate( material, rays[gid], hitPnt, rays[gid].random_dir, rays[gid].pdf_hemi_brdf, rays[gid].albedo );
-	rays[gid].bContinue = uint( bContinue );
+	if ( frame_id == 0u )
+	{
+		colors[idx] = pixel;
+	}
+	else
+	{
+		uint count = frame_id + 1u;
+		colors[idx] = ( colors[idx] * float( frame_id ) + pixel ) * ( 1.0f / float( count ) ); //( colors[idx] * float( frame_id ) + pixel ) * ( 1.0f / float( frame_id + 1 ) );
+		
+	}
+	colors[idx].w = 1.0f;
 
-    RTRay ray_random;
-	ray_random.pos = hitPnt.position + shadowBias * rays[gid].random_dir;
-	ray_random.dir = rays[gid].random_dir;
-	rays[gid].brdf = material_brdf( material, rays[gid], hitPnt, ray_random );
-
+	imageStore( destTex, storePos, colors[idx] );
 }
-`;
