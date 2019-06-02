@@ -181,7 +181,7 @@ void BVH::getSplitDimAndCoordBySAH( uint32_t &split_dim, float &split_coord, uin
 			{
 				const AABB& box = ( *build_prims )[i].getAABB();
 				float area = box.surfaceArea();
-
+				/*
 				if ( box.aabb_minaabb_min[split_dim_current] < split_coord_current 
                     && box.aabb_minaabb_max[split_dim_current] > split_coord_current )
 				{
@@ -193,7 +193,8 @@ void BVH::getSplitDimAndCoordBySAH( uint32_t &split_dim, float &split_coord, uin
 					leftNumber++;
 					rightNumber++;
 				}
-				else if ( ( *build_prims )[i].getAABB().getCentroid()[split_dim_current] < split_coord_current )
+				else */
+				if ( ( *build_prims )[i].getAABB().getCentroid()[split_dim_current] < split_coord_current )
 				{
 					leftArea += area;
 					leftNumber++;

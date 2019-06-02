@@ -45,8 +45,7 @@ struct RTRay
 	vec3 random_dir;
 	float brdf;
 
-    vec3 light_color;
-	
+	vec3 light_color;
 };
 
 struct AABB
@@ -60,13 +59,13 @@ struct AABB
 		aabb_minaabb_max = max;
 	}
 
-    vec3 getCentroid() const
+	vec3 getCentroid() const
 	{
 		vec3 v = ( aabb_minaabb_min + aabb_minaabb_max ) * 0.5f;
 		return v;
 	};
 
-    void expandToInclude( const vec3 &p )
+	void expandToInclude( const vec3 &p )
 	{
 		aabb_minaabb_min = ::min( aabb_minaabb_min, p );
 		aabb_minaabb_max = ::max( aabb_minaabb_max, p );
@@ -83,7 +82,7 @@ struct AABB
 		}
 	}
 
-    uint32_t maxDimension() const
+	uint32_t maxDimension() const
 	{
 		vec3 extent = aabb_minaabb_max - aabb_minaabb_min;
 
@@ -99,7 +98,7 @@ struct AABB
 		return result;
 	}
 
-    float surfaceArea() const
+	float surfaceArea() const
 	{
 		vec3 extent = aabb_minaabb_max - aabb_minaabb_min;
 		return 2.f * ( extent.x * extent.z + extent.x * extent.y + extent.y * extent.z );
@@ -113,7 +112,7 @@ struct RTTriangle
 	vec2 textures[3];
 	int mIndex;
 
-	RTTriangle( const vec3 &v1, const vec3 &v2, const vec3 &v3, const vec3 &n1, const vec3 &n2, const vec3 &n3, const vec2 &t1, const vec2 &t2, const vec2 &t3, const int& idx )
+	RTTriangle( const vec3 &v1, const vec3 &v2, const vec3 &v3, const vec3 &n1, const vec3 &n2, const vec3 &n3, const vec2 &t1, const vec2 &t2, const vec2 &t3, const int &idx )
 	{
 		vertices[0] = v1;
 		vertices[1] = v2;
@@ -127,31 +126,31 @@ struct RTTriangle
 		textures[1] = t2;
 		textures[2] = t3;
 
-        mIndex = idx;
+		mIndex = idx;
 	}
 
-    RTTriangle(const RTTriangle& other)
-    {
+	RTTriangle( const RTTriangle &other )
+	{
 		if ( this == &other )
 			return;
 
-        vertices[0] = other.vertices[0];
+		vertices[0] = other.vertices[0];
 		vertices[1] = other.vertices[1];
 		vertices[2] = other.vertices[2];
 
 		normals[0] = other.normals[0];
 		normals[1] = other.normals[1];
-		normals[2] = other.normals[2] ;
+		normals[2] = other.normals[2];
 
 		textures[0] = other.textures[0];
 		textures[1] = other.textures[1];
 		textures[2] = other.textures[2];
 
 		mIndex = other.mIndex;
-    }
+	}
 
-    AABB getAABB()
-    {
+	AABB getAABB()
+	{
 		vec3 min, max;
 		min = max = vertices[0];
 
@@ -162,5 +161,19 @@ struct RTTriangle
 		max = ::max( max, vertices[2] );
 
 		return AABB( min, max );
-    }
+	}
+
+	vec3 getCentroid()
+	{
+		return ( vertices[0] + vertices[1] + vertices[2] ) / 3.0f;
+	}
+
+	float surfaceArea()
+	{
+		vec3 ab = vec3( vertices[1].x - vertices[0].x, vertices[1].y - vertices[0].y, vertices[1].z - vertices[0].z );
+		vec3 ac = vec3( vertices[2].x - vertices[0].x, vertices[2].y - vertices[0].y, vertices[2].z - vertices[0].z );
+
+        float area = 0.5f * glm::length( glm::cross( ab, ac ) );
+		return area;
+	}
 };

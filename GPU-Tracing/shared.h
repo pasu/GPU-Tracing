@@ -1,7 +1,7 @@
 #define SCRWIDTH			800
 #define SCRHEIGHT			800
 
-#define  WAVEFRONT
+//#define  WAVEFRONT
 
 #ifdef WAVEFRONT
     #define LocalSize_X 128
@@ -18,5 +18,5 @@
 #define SAMPLE_NUM 16
 #define SAMPLE_NUM2 SAMPLE_NUM *SAMPLE_NUM
 
-//#define SAH_ON
-#define BIN_NUM 256
+#define SAH_ON
+#define BIN_NUM 128
