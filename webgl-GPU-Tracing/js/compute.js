@@ -6,7 +6,7 @@ var frame_id = 0;
 var total_num = 0;
 var qc = new Uint32Array(4);
 
-var bWaveFront = 1;
+var bWaveFront = 0;
 
 var requestFiles = ["triangles.bin","bvh.bin","material.bin","texture.bin","texIn.bin","lights.bin","lights_num.bin"];
 var scene_buffer = [];
